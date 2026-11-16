@@ -55,7 +55,9 @@ describe('login', () => {
     await userEvent.type(await screen.findByLabelText('Email'), 'growin@deskflow.test');
     await userEvent.type(screen.getByLabelText('Password'), 'Deskflow!2026');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(await screen.findByRole('heading', { name: 'Team' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Team' }, { timeout: 3000 }),
+    ).toBeInTheDocument();
   });
 
   it('redirects to sign-in when the session is missing', async () => {

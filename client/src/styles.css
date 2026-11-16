@@ -146,62 +146,6 @@ dialog.df-dialog[open]::backdrop {
   }
 }
 
-/* Sign-in page: light on the left, navy on the right, the three status colours where they meet. */
-.df-login-bg {
-  /* top to bottom on phones (one column), left to right once the two cards sit side by side */
-  --df-login-angle: 180deg;
-  background-color: #0f1b2d;
-  background-image:
-    radial-gradient(28% 34% at 50% 26%, rgb(91 127 240 / 0.42), transparent 72%),
-    radial-gradient(24% 30% at 52% 52%, rgb(232 162 62 / 0.34), transparent 72%),
-    radial-gradient(28% 34% at 48% 78%, rgb(70 185 122 / 0.36), transparent 72%),
-    linear-gradient(
-      var(--df-login-angle, 180deg),
-      #faf9f7 0%,
-      #f1f0ee 22%,
-      #c7cedd 40%,
-      #6a7895 52%,
-      #24344d 64%,
-      #0f1b2d 80%,
-      #0b1525 100%
-    );
-}
-
-@media (min-width: 64rem) {
-  .df-login-bg {
-    --df-login-angle: 90deg;
-  }
-}
-
-/* Sign-in card: light drifting behind the glass, and a soft ring on the current stop. */
-.df-blob {
-  animation: df-drift 18s ease-in-out infinite alternate;
-}
-@keyframes df-drift {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(28px, -22px, 0) scale(1.08);
-  }
-  100% {
-    transform: translate3d(-18px, 18px, 0) scale(0.96);
-  }
-}
-.df-pulse {
-  animation: df-pulse 2.2s cubic-bezier(0.23, 1, 0.32, 1) infinite;
-}
-@keyframes df-pulse {
-  0% {
-    opacity: 0.7;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.7);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
