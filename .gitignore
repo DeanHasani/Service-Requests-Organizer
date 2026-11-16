@@ -1,0 +1,10 @@
+node_modules
+dist
+*.db
+*.db-journal
+.env
+coverage
+test-results
+playwright-report
+server/prisma/*.db*
+

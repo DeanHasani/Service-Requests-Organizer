@@ -1,0 +1,159 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/public-sans';
+
+@theme {
+  --font-sans: 'Public Sans Variable', ui-sans-serif, system-ui, sans-serif;
+
+  /* Canvas and surfaces */
+  --color-canvas: #faf9f7;
+  --color-surface: #ffffff;
+  --color-sunken: #f3f1ed;
+  --color-line: #e7e4df;
+  --color-line-strong: #d6d1c9;
+
+  /* Ink (navy-tinted neutrals) */
+  --color-ink: #172033;
+  --color-ink-2: #4f5869;
+  --color-ink-3: #646b7a;
+
+  /* Shell */
+  --color-navy: #0f1b2d;
+  --color-navy-2: #18263c;
+  --color-navy-3: #24344d;
+  --color-navy-ink: #c3cbd8;
+  --color-navy-ink-dim: #8592a8;
+
+  /* Accent: focus, selection, links only */
+  --color-cobalt: #3d63dd;
+  --color-cobalt-soft: #e8edfc;
+
+  /* Status */
+  --color-open: #3d5fc0;
+  --color-open-soft: #eaeffb;
+  --color-progress: #93560c;
+  --color-progress-soft: #fbf1e1;
+  --color-progress-dot: #e09a36;
+  --color-resolved: #1f6e48;
+  --color-resolved-soft: #e5f3eb;
+  --color-resolved-dot: #3fa56f;
+
+  /* Priority */
+  --color-urgent: #b32d24;
+  --color-urgent-soft: #fbe9e7;
+  --color-high: #a24a12;
+  --color-high-soft: #fbeee3;
+
+  --radius-control: 6px;
+  --radius-panel: 10px;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+  --shadow-panel: 0 1px 2px rgb(23 32 51 / 0.04), 0 1px 1px rgb(23 32 51 / 0.03);
+  --shadow-pop: 0 12px 32px -8px rgb(15 27 45 / 0.22), 0 2px 6px rgb(15 27 45 / 0.08);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-canvas text-ink font-sans text-sm;
+  }
+  ::selection {
+    background: var(--color-cobalt-soft);
+    color: var(--color-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-cobalt);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  input,
+  textarea,
+  select {
+    caret-color: var(--color-cobalt);
+  }
+  a {
+    text-underline-offset: 3px;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Native <dialog> with enter/exit motion (no JS animation needed). */
+dialog.df-dialog {
+  opacity: 0;
+  transform: translateY(8px) scale(0.97);
+  transition:
+    opacity 180ms var(--ease-out),
+    transform 220ms var(--ease-out),
+    overlay 220ms allow-discrete,
+    display 220ms allow-discrete;
+}
+dialog.df-dialog[open] {
+  opacity: 1;
+  transform: none;
+}
+@starting-style {
+  dialog.df-dialog[open] {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+dialog.df-dialog::backdrop {
+  background: rgb(15 27 45 / 0);
+  backdrop-filter: blur(0);
+  transition:
+    background 220ms var(--ease-out),
+    backdrop-filter 220ms var(--ease-out),
+    overlay 220ms allow-discrete,
+    display 220ms allow-discrete;
+}
+dialog.df-dialog[open]::backdrop {
+  background: rgb(15 27 45 / 0.38);
+  backdrop-filter: blur(2px);
+}
+@starting-style {
+  dialog.df-dialog[open]::backdrop {
+    background: rgb(15 27 45 / 0);
+    backdrop-filter: blur(0);
+  }
+}
+
+/* Skeleton shimmer */
+.df-skeleton {
+  background: linear-gradient(90deg, var(--color-sunken) 0%, #ebe8e3 50%, var(--color-sunken) 100%);
+  background-size: 200% 100%;
+  animation: df-shimmer 1.4s linear infinite;
+  border-radius: 4px;
+}
+@keyframes df-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .df-skeleton {
+    animation: none;
+  }
+}

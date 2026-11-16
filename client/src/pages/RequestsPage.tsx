@@ -1,0 +1,569 @@
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { motion } from 'motion/react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsUpDown,
+  Inbox,
+  ListTodo,
+  Plus,
+  Search,
+  SearchX,
+  X,
+} from 'lucide-react';
+import {
+  PRIORITIES,
+  PRIORITY_LABEL,
+  SOURCES,
+  SOURCE_LABEL,
+  STATUSES,
+  STATUS_LABEL,
+  type ListRequestsQuery,
+  type ServiceRequest,
+  type SortField,
+} from '@deskflow/shared';
+import { useAssignees, useRequests } from '../lib/queries';
+import { errorMessage } from '../lib/api';
+import { cx, formatDateTime, formatShortDate } from '../lib/format';
+import {
+  Avatar,
+  Button,
+  EmptyState,
+  ErrorState,
+  Input,
+  PageHeader,
+  Panel,
+  Select,
+  Skeleton,
+} from '../components/ui';
+import {
+  LifecycleRail,
+  PriorityBadge,
+  RequestRef,
+  SourceLabel,
+  StatusBadge,
+} from '../components/request-bits';
+
+type Scope = 'all' | 'mine';
+const FILTER_KEYS = ['q', 'status', 'priority', 'source', 'assignee'] as const;
+
+function useDebounced<T>(value: T, ms = 300) {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
+
+export function RequestsPage({ scope }: { scope: Scope }) {
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [search, setSearch] = useState(params.get('q') ?? '');
+  const debounced = useDebounced(search.trim());
+
+  const get = (k: string) => params.get(k) ?? undefined;
+  const sort = (get('sort') as SortField | undefined) ?? 'createdAt';
+  const order = (get('order') as 'asc' | 'desc' | undefined) ?? 'desc';
+  const page = Number(get('page') ?? 1) || 1;
+
+  const update = (patch: Record<string, string | undefined>, resetPage = true) => {
+    const next = new URLSearchParams(params);
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) next.set(k, v);
+      else next.delete(k);
+    }
+    if (resetPage) next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  // Push the debounced search into the URL (and back to page 1).
+  useEffect(() => {
+    if ((params.get('q') ?? '') !== debounced) update({ q: debounced || undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debounced]);
+
+  const query: ListRequestsQuery = {
+    q: get('q'),
+    status: get('status') as ListRequestsQuery['status'],
+    priority: get('priority') as ListRequestsQuery['priority'],
+    source: get('source') as ListRequestsQuery['source'],
+    assignee: scope === 'mine' ? 'me' : (get('assignee') as ListRequestsQuery['assignee']),
+    sort,
+    order,
+    page,
+    pageSize: 15,
+  };
+  const list = useRequests(query);
+  const assignees = useAssignees();
+  const hasFilters = FILTER_KEYS.some((k) => params.get(k));
+
+  const clear = () => {
+    setSearch('');
+    update(Object.fromEntries(FILTER_KEYS.map((k) => [k, undefined])));
+  };
+
+  const toggleSort = (field: SortField) =>
+    update({ sort: field, order: sort === field && order === 'desc' ? 'asc' : 'desc' }, false);
+
+  const open = (r: ServiceRequest) => navigate(`/requests/${r.id}`);
+
+  return (
+    <>
+      <PageHeader
+        title={scope === 'mine' ? 'My requests' : 'All requests'}
+        subtitle={
+          scope === 'mine'
+            ? 'Requests assigned to you, newest first.'
+            : 'Every request the team has registered.'
+        }
+        actions={
+          <Link
+            to="/requests/new"
+            className="inline-flex h-9 items-center gap-2 rounded-control bg-navy px-3.5 text-sm font-medium text-white transition-[background-color,transform] duration-150 hover:bg-navy-3 active:scale-[0.97]"
+          >
+            <Plus className="size-4" aria-hidden /> New request
+          </Link>
+        }
+      />
+
+      <Panel className="overflow-hidden">
+        <div role="search" className="flex flex-wrap items-center gap-2 border-b border-line p-3">
+          <div className="relative min-w-56 flex-1">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3"
+              aria-hidden
+            />
+            <Input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search title, requester, contact or SR number"
+              aria-label="Search requests"
+              className="pl-9"
+            />
+          </div>
+          <Select
+            aria-label="Filter by status"
+            value={get('status') ?? ''}
+            onChange={(e) => update({ status: e.target.value })}
+            className="w-36"
+          >
+            <option value="">Any status</option>
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABEL[s]}
+              </option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Filter by priority"
+            value={get('priority') ?? ''}
+            onChange={(e) => update({ priority: e.target.value })}
+            className="w-36"
+          >
+            <option value="">Any priority</option>
+            {PRIORITIES.map((p) => (
+              <option key={p} value={p}>
+                {PRIORITY_LABEL[p]}
+              </option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Filter by source"
+            value={get('source') ?? ''}
+            onChange={(e) => update({ source: e.target.value })}
+            className="w-32"
+          >
+            <option value="">Any source</option>
+            {SOURCES.map((s) => (
+              <option key={s} value={s}>
+                {SOURCE_LABEL[s]}
+              </option>
+            ))}
+          </Select>
+          {scope === 'all' && (
+            <Select
+              aria-label="Filter by assignee"
+              value={get('assignee') ?? ''}
+              onChange={(e) => update({ assignee: e.target.value })}
+              className="w-40"
+            >
+              <option value="">Anyone</option>
+              <option value="me">Assigned to me</option>
+              <option value="none">Unassigned</option>
+              {assignees.data?.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </Select>
+          )}
+          {hasFilters && (
+            <Button variant="ghost" size="sm" onClick={clear}>
+              <X className="size-3.5" aria-hidden /> Clear filters
+            </Button>
+          )}
+        </div>
+
+        {/* thin progress line while a new page/filter loads over the previous results */}
+        <div className="relative h-0.5 overflow-hidden" aria-hidden>
+          {list.isFetching && !list.isPending && (
+            <motion.span
+              className="absolute inset-y-0 w-1/3 bg-cobalt/60"
+              initial={{ transform: 'translateX(-100%)' }}
+              animate={{ transform: 'translateX(300%)' }}
+              transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
+            />
+          )}
+        </div>
+
+        {list.isPending ? (
+          <LoadingRows />
+        ) : list.isError ? (
+          <ErrorState message={errorMessage(list.error)} onRetry={() => void list.refetch()} />
+        ) : list.data.items.length === 0 ? (
+          hasFilters ? (
+            <EmptyState
+              icon={<SearchX />}
+              title="No requests match your search or filters."
+              body="Try a different word or remove a filter."
+              action={
+                <Button size="sm" onClick={clear}>
+                  Clear filters
+                </Button>
+              }
+            />
+          ) : scope === 'mine' ? (
+            <EmptyState
+              icon={<ListTodo />}
+              title="You don't have any assigned requests at the moment."
+              body="Pick something up from the unassigned queue."
+              action={
+                <Link to="/unassigned" className="text-sm font-medium text-cobalt hover:underline">
+                  View unassigned requests
+                </Link>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={<Inbox />}
+              title="There are no requests yet."
+              body="Create your first request to get started."
+              action={
+                <Link
+                  to="/requests/new"
+                  className="text-sm font-medium text-cobalt hover:underline"
+                >
+                  Create a request
+                </Link>
+              }
+            />
+          )
+        ) : (
+          <div
+            className={cx(
+              'transition-opacity duration-200',
+              list.isPlaceholderData && 'opacity-60',
+            )}
+          >
+            <RequestTable
+              items={list.data.items}
+              sort={sort}
+              order={order}
+              onSort={toggleSort}
+              onOpen={open}
+            />
+            <MobileList items={list.data.items} />
+            <Pagination
+              page={list.data.page}
+              totalPages={list.data.totalPages}
+              total={list.data.total}
+              pageSize={list.data.pageSize}
+              onPage={(p) => update({ page: p > 1 ? String(p) : undefined }, false)}
+            />
+          </div>
+        )}
+      </Panel>
+    </>
+  );
+}
+
+const columns: { label: string; sort?: SortField; className?: string; dates?: true }[] = [
+  { label: 'Reference', sort: 'referenceNumber', className: 'w-[9rem]' },
+  { label: 'Title', sort: 'title' },
+  { label: 'Requester', className: 'w-[9rem]' },
+  { label: 'Source', className: 'w-[4rem]' },
+  { label: 'Priority', sort: 'priority', className: 'w-[6rem]' },
+  { label: 'Status', className: 'w-[7.25rem]' },
+  { label: 'Assignee', className: 'w-[8.75rem]' },
+  // Created and Updated share one stacked column so Title keeps the width.
+  { label: 'Created / Updated', className: 'w-[9.5rem]', dates: true },
+];
+
+function SortButton({
+  field,
+  label,
+  sort,
+  order,
+  onSort,
+}: {
+  field: SortField;
+  label: string;
+  sort: SortField;
+  order: 'asc' | 'desc';
+  onSort: (f: SortField) => void;
+}) {
+  const active = sort === field;
+  const Icon = active ? (order === 'asc' ? ArrowUp : ArrowDown) : null;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(field)}
+      className={cx(
+        'inline-flex items-center gap-0.5 rounded transition-colors hover:text-ink',
+        active && 'text-ink',
+      )}
+    >
+      {label}
+      {Icon && <Icon className="size-3.5" aria-hidden />}
+    </button>
+  );
+}
+
+function RequestTable({
+  items,
+  sort,
+  order,
+  onSort,
+  onOpen,
+}: {
+  items: ServiceRequest[];
+  sort: SortField;
+  order: 'asc' | 'desc';
+  onSort: (f: SortField) => void;
+  onOpen: (r: ServiceRequest) => void;
+}) {
+  return (
+    <div className="hidden overflow-x-auto md:block">
+      <table className="w-full min-w-[1000px] table-fixed border-collapse text-left text-[13px]">
+        <thead>
+          <tr className="border-b border-line bg-canvas/60">
+            {columns.map((c) => {
+              const active = c.sort === sort;
+              const SortIcon = active ? (order === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown;
+              return (
+                <th
+                  key={c.label}
+                  scope="col"
+                  aria-sort={
+                    active || (c.dates && (sort === 'createdAt' || sort === 'updatedAt'))
+                      ? order === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : undefined
+                  }
+                  className={cx(
+                    'px-2.5 py-2.5 text-xs font-medium whitespace-nowrap text-ink-2 first:pl-4',
+                    c.className,
+                  )}
+                >
+                  {c.dates ? (
+                    <span className="inline-flex items-center gap-1">
+                      <SortButton
+                        field="createdAt"
+                        label="Created"
+                        sort={sort}
+                        order={order}
+                        onSort={onSort}
+                      />
+                      <span aria-hidden className="text-ink-3">
+                        /
+                      </span>
+                      <SortButton
+                        field="updatedAt"
+                        label="Updated"
+                        sort={sort}
+                        order={order}
+                        onSort={onSort}
+                      />
+                    </span>
+                  ) : c.sort ? (
+                    <button
+                      type="button"
+                      onClick={() => onSort(c.sort!)}
+                      className={cx(
+                        '-mx-1 inline-flex items-center gap-1 rounded px-1 transition-colors hover:text-ink',
+                        active && 'text-ink',
+                      )}
+                    >
+                      {c.label}
+                      <SortIcon className={cx('size-3.5', !active && 'opacity-40')} aria-hidden />
+                    </button>
+                  ) : (
+                    c.label
+                  )}
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((r) => (
+            <tr
+              key={r.id}
+              onClick={(e) => {
+                if (!(e.target as HTMLElement).closest('a')) onOpen(r);
+              }}
+              className="group cursor-pointer border-b border-line transition-colors last:border-b-0 hover:bg-canvas"
+            >
+              <td className="py-3 pr-2.5 pl-4 whitespace-nowrap">
+                <span className="flex items-center gap-2.5">
+                  <LifecycleRail status={r.status} />
+                  <RequestRef value={r.referenceNumber} />
+                </span>
+              </td>
+              <td className="px-2.5 py-3">
+                <Link
+                  to={`/requests/${r.id}`}
+                  title={r.title}
+                  className="block truncate font-medium text-ink decoration-ink-3/60 group-hover:underline"
+                >
+                  {r.title}
+                </Link>
+              </td>
+              <td className="truncate px-2.5 py-3 text-ink-2" title={r.requesterName}>
+                {r.requesterName}
+              </td>
+              <td className="px-2.5 py-3">
+                <SourceLabel source={r.source} iconOnly />
+              </td>
+              <td className="px-2.5 py-3">
+                <PriorityBadge priority={r.priority} />
+              </td>
+              <td className="px-2.5 py-3">
+                <StatusBadge status={r.status} />
+              </td>
+              <td className="px-2.5 py-3">
+                {r.assignedTo ? (
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Avatar name={r.assignedTo.name} size="xs" />
+                    <span className="truncate">{r.assignedTo.name}</span>
+                  </span>
+                ) : (
+                  <span className="text-ink-3">Unassigned</span>
+                )}
+              </td>
+              <td className="tabular px-2.5 py-2.5 leading-tight whitespace-nowrap">
+                <span className="block text-ink-2" title={`Created ${formatDateTime(r.createdAt)}`}>
+                  {formatShortDate(r.createdAt)}
+                </span>
+                <span
+                  className="block text-xs text-ink-3"
+                  title={`Updated ${formatDateTime(r.updatedAt)}`}
+                >
+                  upd. {formatShortDate(r.updatedAt)}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MobileList({ items }: { items: ServiceRequest[] }) {
+  return (
+    <ul className="divide-y divide-line md:hidden">
+      {items.map((r) => (
+        <li key={r.id}>
+          <Link to={`/requests/${r.id}`} className="block px-4 py-3 active:bg-canvas">
+            <span className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2">
+                <LifecycleRail status={r.status} />
+                <RequestRef value={r.referenceNumber} />
+              </span>
+              <PriorityBadge priority={r.priority} />
+            </span>
+            <span className="mt-1.5 block font-medium text-ink">{r.title}</span>
+            <span className="mt-1 flex items-center justify-between gap-3 text-xs text-ink-2">
+              <span className="truncate">{r.requesterName}</span>
+              <span className="shrink-0">{r.assignedTo?.name ?? 'Unassigned'}</span>
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function LoadingRows() {
+  return (
+    <div aria-busy="true" aria-label="Loading requests">
+      {Array.from({ length: 8 }, (_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-6 border-b border-line px-4 py-3.5 last:border-b-0"
+        >
+          <Skeleton className="w-20" />
+          <Skeleton className="flex-1" />
+          <Skeleton className="hidden w-24 md:block" />
+          <Skeleton className="hidden w-20 md:block" />
+          <Skeleton className="w-16" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function Pagination({
+  page,
+  totalPages,
+  total,
+  pageSize,
+  onPage,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  pageSize: number;
+  onPage: (p: number) => void;
+}) {
+  const from = (page - 1) * pageSize + 1;
+  const to = Math.min(total, page * pageSize);
+  return (
+    <nav
+      aria-label="Pagination"
+      className="flex items-center justify-between gap-4 border-t border-line px-4 py-3 text-[13px] text-ink-2"
+    >
+      <span className="tabular">
+        {from}–{to} of {total}
+      </span>
+      <span className="flex items-center gap-2">
+        <span className="tabular hidden sm:inline">
+          Page {page} of {totalPages}
+        </span>
+        <Button
+          size="sm"
+          onClick={() => onPage(page - 1)}
+          disabled={page <= 1}
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="size-4" aria-hidden />
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => onPage(page + 1)}
+          disabled={page >= totalPages}
+          aria-label="Next page"
+        >
+          <ChevronRight className="size-4" aria-hidden />
+        </Button>
+      </span>
+    </nav>
+  );
+}

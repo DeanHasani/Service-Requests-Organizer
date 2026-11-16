@@ -1,0 +1,134 @@
+# DESKFLOW
+
+An internal service request tracker for a small IT support team. Requests arrive by phone, email and chat; staff log them in DESKFLOW, give each one an owner, move it from **Open** to **In progress** to **Resolved**, and leave internal notes along the way. Every change is recorded in an activity history.
+
+## The problem
+
+Requests used to live in personal notes and spreadsheets. Some were forgotten, some were handled twice, and nobody could tell who owned a request or whether it was done. DESKFLOW gives the team one queue with one owner per request and a full audit trail.
+
+## Features
+
+- Sign-in with server-side sessions (no public sign-up; demo accounts are seeded)
+- Two roles: **Manager** (everything) and **Employee** (works on their own requests, can claim unassigned ones)
+- Dashboard with live counts, status split, your workload, recent requests and recent activity
+- Request list with search, filters, sortable columns and server-side pagination
+- Create requests with validation and duplicate-submission protection
+- Request page: edit, assign, reassign, unassign, change priority, start, resolve, reopen
+- Internal notes and an automatic, attributed activity history
+- My requests, Unassigned queue (with one-click assign or claim) and Team workload page
+- Managers can add team members and deactivate or reactivate accounts
+- Concurrent edits are detected (a stale write is rejected, not silently applied)
+
+## Tech stack
+
+| Layer    | Choice                                                                                                                   |
+| -------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, React Router 7, TanStack Query, React Hook Form, Zod, Motion, Lucide, Sonner |
+| Backend  | Node.js, Express 5, TypeScript (run with `tsx`), Zod                                                                     |
+| Database | SQLite with Prisma 6 and Prisma Migrate                                                                                  |
+| Auth     | Server-side sessions in the database, bcrypt, HTTP-only cookies, CSRF token, rate-limited login                          |
+| Tests    | Vitest, Supertest, React Testing Library, Playwright                                                                     |
+| Tooling  | npm workspaces, strict TypeScript, ESLint, Prettier                                                                      |
+
+Architecture and decisions: [docs/architecture.md](docs/architecture.md). Data model: [docs/database.md](docs/database.md). Assumptions: [docs/assumptions.md](docs/assumptions.md). Tests and results: [docs/testing.md](docs/testing.md).
+
+## Requirements
+
+- Node.js 20.19 or newer (developed on Node 25)
+- npm 10 or newer
+
+Nothing else: SQLite is a file, so there is no database server to install.
+
+## Setup
+
+```bash
+git clone https://github.com/DeanHasani/Service-Requests-Organizer.git
+cd Service-Requests-Organizer
+
+npm install                              # installs all three workspaces
+cp server/.env.example server/.env       # Windows: copy server\.env.example server\.env
+npm run setup                            # applies migrations, then seeds demo data
+npm run dev                              # API on :4000, web app on :5173
+```
+
+Open http://localhost:5173 and sign in with a demo account.
+
+### Environment variables (`server/.env`)
+
+| Variable            | Default         | Purpose                                          |
+| ------------------- | --------------- | ------------------------------------------------ |
+| `DATABASE_URL`      | `file:./dev.db` | SQLite file, relative to `server/prisma/`        |
+| `PORT`              | `4000`          | API port                                         |
+| `NODE_ENV`          | `development`   | `production` turns on `Secure` cookies           |
+| `SESSION_TTL_HOURS` | `8`             | Session lifetime; it slides forward while in use |
+| `LOGIN_RATE_LIMIT`  | `10`            | Failed sign-ins allowed per IP per 15 minutes    |
+| `SEED_PASSWORD`     | `Deskflow!2026` | Password the seed gives every demo account       |
+
+## Database commands
+
+| Command                            | What it does                                                          |
+| ---------------------------------- | --------------------------------------------------------------------- |
+| `npm run db:migrate`               | Applies pending migrations (`prisma migrate deploy`). Safe to rerun.  |
+| `npm run db:seed`                  | Adds demo users and requests. Idempotent: rerunning adds nothing new. |
+| `npm run setup`                    | Both of the above.                                                    |
+| `npm run db:migrate:dev -w server` | Creates a new migration after a schema change (development only).     |
+| `npm run db:reset`                 | Deletes all data in `dev.db`, reapplies migrations and reseeds.       |
+
+## Demo accounts
+
+All use the password **`Deskflow!2026`** (the `SEED_PASSWORD` value). The sign-in page lists them and fills the form for you.
+
+| Name           | Email                 | Role     |
+| -------------- | --------------------- | -------- |
+| Growin Manager | growing@deskflow.test | Manager  |
+| Dean Hasani    | dean@deskflow.test    | Employee |
+| Roman Max      | roman@deskflow.test   | Employee |
+| Roxanne Keys   | roxanne@deskflow.test | Employee |
+
+The seed adds 18 requests covering every status, priority and source, assigned and unassigned, with notes and history.
+
+## Demo walkthrough
+
+1. Sign in as **Growin Manager** (`growing@deskflow.test`). Click **New request**, fill it in, create it.
+2. On the request page, pick **Dean Hasani** in the Assignee field.
+3. Sign out (bottom of the sidebar). Sign in as **Dean** (`dean@deskflow.test`).
+4. Open **My requests**, find the request, add a note, click **Start work**, then **Resolve**.
+5. Sign in as the manager again and open the request: resolution details, the note and the full activity history are there.
+6. Stop the servers and run `npm run dev` again. Everything is still there.
+
+## Scripts
+
+| Command             | What it does                                                                     |
+| ------------------- | -------------------------------------------------------------------------------- |
+| `npm run dev`       | API and web app with hot reload                                                  |
+| `npm test`          | Server (Supertest) and client (React Testing Library) tests                      |
+| `npm run test:e2e`  | Playwright end-to-end journey on its own database                                |
+| `npm run test:all`  | All of the above                                                                 |
+| `npm run typecheck` | Strict TypeScript across all workspaces                                          |
+| `npm run lint`      | ESLint                                                                           |
+| `npm run format`    | Prettier                                                                         |
+| `npm run build`     | Production build of the web app                                                  |
+| `npm start`         | API in production mode; it also serves the built web app if `client/dist` exists |
+
+The first `npm run test:e2e` needs a browser: `npx playwright install chromium`.
+
+### Running in production mode
+
+```bash
+npm run build
+NODE_ENV=production npm start      # serves app + API on :4000
+```
+
+In production the session cookie is `Secure`, so serve it over HTTPS (or `localhost`).
+
+## Project layout
+
+```
+client/   React app (pages, components, data hooks)
+server/   Express API, Prisma schema, migrations, seed, API tests
+shared/   Zod schemas, enums, lifecycle and permission rules, DTO types
+tests/    Playwright end-to-end tests
+docs/     Architecture, database, assumptions, testing
+```
+
+See also [PROJECT_PLAN.md](PROJECT_PLAN.md) and [FINAL_IMPLEMENTATION_REPORT.md](FINAL_IMPLEMENTATION_REPORT.md).
