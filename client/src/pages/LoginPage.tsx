@@ -43,7 +43,7 @@ export function LoginPage() {
   });
 
   return (
-    <div className="grid min-h-dvh bg-canvas lg:grid-cols-2">
+    <div className="df-login-bg grid min-h-dvh lg:grid-cols-2">
       <div className="hidden p-5 lg:block xl:p-6">
         <GlassCard className="h-full">
           <div className="flex h-full flex-col justify-between p-12 xl:p-14">
@@ -84,7 +84,7 @@ export function LoginPage() {
       </div>
 
       <main className="flex p-4 sm:p-5 xl:p-6">
-        <div className="flex w-full items-center justify-center rounded-[28px] bg-white/55 px-6 py-10 shadow-[0_28px_70px_-28px_rgb(15_27_45/0.28),0_4px_14px_-6px_rgb(15_27_45/0.08)] backdrop-blur-xl sm:px-10">
+        <div className="flex w-full items-center justify-center rounded-[28px] bg-white/92 px-6 py-10 shadow-[0_28px_70px_-28px_rgb(15_27_45/0.28),0_4px_14px_-6px_rgb(15_27_45/0.08)] backdrop-blur-xl sm:px-10">
           <div className="w-full max-w-sm">
             <span className="mb-10 flex items-center gap-2.5 lg:hidden">
               <svg viewBox="0 0 32 32" className="size-8" aria-hidden>
