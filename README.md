@@ -18,6 +18,7 @@ Requests used to live in personal notes and spreadsheets. Some were forgotten, s
 - My requests, Unassigned queue (with one-click assign or claim) and Team workload page
 - Managers can add team members and deactivate or reactivate accounts
 - Concurrent edits are detected (a stale write is rejected, not silently applied)
+- Works on phones, tablets (iPad portrait and landscape) and desktops; tables turn into cards on small screens
 
 ## Tech stack
 

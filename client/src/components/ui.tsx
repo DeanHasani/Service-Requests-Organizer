@@ -114,7 +114,7 @@ export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputEleme
     <input
       aria-describedby={describedBy(rest.id, invalid)}
       {...rest}
-      className={cx(control, 'h-9 px-3 text-sm', className)}
+      className={cx(control, 'h-9 px-3 text-base sm:text-sm', className)}
     />
   );
 }
@@ -125,7 +125,11 @@ export function Textarea({ className, ...rest }: TextareaHTMLAttributes<HTMLText
     <textarea
       aria-describedby={describedBy(rest.id, invalid)}
       {...rest}
-      className={cx(control, 'min-h-24 resize-y px-3 py-2 text-sm leading-relaxed', className)}
+      className={cx(
+        control,
+        'min-h-24 resize-y px-3 py-2 text-base leading-relaxed sm:text-sm',
+        className,
+      )}
     />
   );
 }
@@ -137,7 +141,7 @@ export function Select({ className, children, ...rest }: SelectHTMLAttributes<HT
       <select
         aria-describedby={describedBy(rest.id, invalid)}
         {...rest}
-        className={cx(control, 'h-9 cursor-pointer appearance-none pr-8 pl-3 text-sm')}
+        className={cx(control, 'h-9 cursor-pointer appearance-none pr-8 pl-3 text-base sm:text-sm')}
       >
         {children}
       </select>

@@ -2,7 +2,7 @@
 
 ## Summary
 
-DESKFLOW is a working full-stack service request tracker for a small internal IT support team. Staff register requests that came in by phone, email or message, give each one an owner, move it through Open, In progress and Resolved, and leave internal notes. Every change is recorded with who made it and when. All requirements in the brief are implemented. 107 automated tests pass, and lint, strict typecheck and formatting are clean.
+DESKFLOW is a working full-stack service request tracker for a small internal IT support team. Staff register requests that came in by phone, email or message, give each one an owner, move it through Open, In progress and Resolved, and leave internal notes. Every change is recorded with who made it and when. All requirements in the brief are implemented. 113 automated tests pass, and lint, strict typecheck and formatting are clean.
 
 ## Completed features
 
@@ -40,10 +40,10 @@ A React single-page app talks to an Express REST API on the same origin. The API
 | ------------------------------------------ | ------- | -------------- |
 | API (Supertest, isolated `test.db`)        | 78      | passed         |
 | Frontend (React Testing Library)           | 26      | passed         |
-| End-to-end (Playwright, isolated `e2e.db`) | 3       | passed         |
-| **Total**                                  | **107** | **all passed** |
+| End-to-end (Playwright, isolated `e2e.db`) | 9       | passed         |
+| **Total**                                  | **113** | **all passed** |
 
-The end-to-end run covers the full ten-step journey from the brief, a permission check across employees, and persistence through a new server process. A clean install from an empty folder (`npm ci`, setup, tests) was also verified. Coverage details and known gaps: [docs/testing.md](docs/testing.md).
+The end-to-end run covers the full ten-step journey from the brief, a permission check across employees, persistence through a new server process, and a no-sideways-scroll check of every screen on phone, iPad and desktop sizes. A clean install from an empty folder (`npm ci`, setup, tests) was also verified. Coverage details and known gaps: [docs/testing.md](docs/testing.md).
 
 ## Reviews carried out
 

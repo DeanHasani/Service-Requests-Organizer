@@ -131,8 +131,11 @@ export function RequestsPage({ scope }: { scope: Scope }) {
       />
 
       <Panel className="overflow-hidden">
-        <div role="search" className="flex flex-wrap items-center gap-2 border-b border-line p-3">
-          <div className="relative min-w-56 flex-1">
+        <div
+          role="search"
+          className="grid grid-cols-2 gap-2 border-b border-line p-3 sm:flex sm:flex-wrap sm:items-center"
+        >
+          <div className="relative col-span-2 sm:min-w-56 sm:flex-1">
             <Search
               className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3"
               aria-hidden
@@ -150,9 +153,9 @@ export function RequestsPage({ scope }: { scope: Scope }) {
             aria-label="Filter by status"
             value={get('status') ?? ''}
             onChange={(e) => update({ status: e.target.value })}
-            className="w-36"
+            className="w-full sm:w-36"
           >
-            <option value="">Any status</option>
+            <option value="">Status</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>
                 {STATUS_LABEL[s]}
@@ -163,9 +166,9 @@ export function RequestsPage({ scope }: { scope: Scope }) {
             aria-label="Filter by priority"
             value={get('priority') ?? ''}
             onChange={(e) => update({ priority: e.target.value })}
-            className="w-36"
+            className="w-full sm:w-36"
           >
-            <option value="">Any priority</option>
+            <option value="">Priority</option>
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>
                 {PRIORITY_LABEL[p]}
@@ -176,9 +179,9 @@ export function RequestsPage({ scope }: { scope: Scope }) {
             aria-label="Filter by source"
             value={get('source') ?? ''}
             onChange={(e) => update({ source: e.target.value })}
-            className="w-32"
+            className="w-full sm:w-32"
           >
-            <option value="">Any source</option>
+            <option value="">Source</option>
             {SOURCES.map((s) => (
               <option key={s} value={s}>
                 {SOURCE_LABEL[s]}
@@ -190,9 +193,9 @@ export function RequestsPage({ scope }: { scope: Scope }) {
               aria-label="Filter by assignee"
               value={get('assignee') ?? ''}
               onChange={(e) => update({ assignee: e.target.value })}
-              className="w-40"
+              className="w-full sm:w-40"
             >
-              <option value="">Anyone</option>
+              <option value="">Assignee</option>
               <option value="me">Assigned to me</option>
               <option value="none">Unassigned</option>
               {assignees.data?.map((u) => (
@@ -203,7 +206,7 @@ export function RequestsPage({ scope }: { scope: Scope }) {
             </Select>
           )}
           {hasFilters && (
-            <Button variant="ghost" size="sm" onClick={clear}>
+            <Button variant="ghost" size="sm" onClick={clear} className="col-span-2 sm:col-span-1">
               <X className="size-3.5" aria-hidden /> Clear filters
             </Button>
           )}
@@ -292,16 +295,28 @@ export function RequestsPage({ scope }: { scope: Scope }) {
   );
 }
 
-const columns: { label: string; sort?: SortField; className?: string; dates?: true }[] = [
+// Columns fold away on narrower screens instead of scrolling sideways.
+const columns: {
+  label: string;
+  sort?: SortField;
+  className?: string;
+  dates?: true;
+  show?: string;
+}[] = [
   { label: 'Reference', sort: 'referenceNumber', className: 'w-[9rem]' },
   { label: 'Title', sort: 'title' },
-  { label: 'Requester', className: 'w-[9rem]' },
-  { label: 'Source', className: 'w-[4rem]' },
+  { label: 'Requester', className: 'w-[9rem]', show: 'hidden xl:table-cell' },
+  { label: 'Source', className: 'w-[4rem]', show: 'hidden xl:table-cell' },
   { label: 'Priority', sort: 'priority', className: 'w-[6rem]' },
   { label: 'Status', className: 'w-[7.25rem]' },
   { label: 'Assignee', className: 'w-[8.75rem]' },
   // Created and Updated share one stacked column so Title keeps the width.
-  { label: 'Created / Updated', className: 'w-[9.5rem]', dates: true },
+  {
+    label: 'Created / Updated',
+    className: 'w-[9.5rem]',
+    dates: true,
+    show: 'hidden min-[1400px]:table-cell',
+  },
 ];
 
 function SortButton({
@@ -348,8 +363,8 @@ function RequestTable({
   onOpen: (r: ServiceRequest) => void;
 }) {
   return (
-    <div className="hidden overflow-x-auto md:block">
-      <table className="w-full min-w-[1000px] table-fixed border-collapse text-left text-[13px]">
+    <div className="relative hidden md:block">
+      <table className="w-full table-fixed border-collapse text-left text-[13px]">
         <thead>
           <tr className="border-b border-line bg-canvas/60">
             {columns.map((c) => {
@@ -369,6 +384,7 @@ function RequestTable({
                   className={cx(
                     'px-2.5 py-2.5 text-xs font-medium whitespace-nowrap text-ink-2 first:pl-4',
                     c.className,
+                    c.show,
                   )}
                 >
                   {c.dates ? (
@@ -435,10 +451,13 @@ function RequestTable({
                   {r.title}
                 </Link>
               </td>
-              <td className="truncate px-2.5 py-3 text-ink-2" title={r.requesterName}>
+              <td
+                className="hidden truncate px-2.5 py-3 text-ink-2 xl:table-cell"
+                title={r.requesterName}
+              >
                 {r.requesterName}
               </td>
-              <td className="px-2.5 py-3">
+              <td className="hidden px-2.5 py-3 xl:table-cell">
                 <SourceLabel source={r.source} iconOnly />
               </td>
               <td className="px-2.5 py-3">
@@ -457,7 +476,7 @@ function RequestTable({
                   <span className="text-ink-3">Unassigned</span>
                 )}
               </td>
-              <td className="tabular px-2.5 py-2.5 leading-tight whitespace-nowrap">
+              <td className="tabular hidden px-2.5 py-2.5 leading-tight whitespace-nowrap min-[1400px]:table-cell">
                 <span className="block text-ink-2" title={`Created ${formatDateTime(r.createdAt)}`}>
                   {formatShortDate(r.createdAt)}
                 </span>

@@ -135,7 +135,7 @@ function UnassignedRow({ request: r }: { request: ServiceRequest }) {
       </div>
       {isManager ? (
         <form
-          className="flex shrink-0 items-center gap-2"
+          className="flex w-full shrink-0 items-center gap-2 sm:w-auto"
           onSubmit={(e) => {
             e.preventDefault();
             if (choice) doAssign(Number(choice));
@@ -145,7 +145,7 @@ function UnassignedRow({ request: r }: { request: ServiceRequest }) {
             aria-label={`Assignee for ${r.referenceNumber}`}
             value={choice}
             onChange={(e) => setChoice(e.target.value)}
-            className="w-48"
+            className="min-w-0 flex-1 sm:w-48 sm:flex-none"
           >
             <option value="">Choose a person…</option>
             {assignees.data?.map((u) => (

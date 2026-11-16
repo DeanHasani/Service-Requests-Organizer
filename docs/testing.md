@@ -41,7 +41,8 @@ Last full run: 16 November 2026, Windows 11, Node 25.8.2, Chromium (Playwright 1
 | Frontend  | `client/src/test/app.test.tsx`               | 20      | passed                   |
 | Frontend  | `client/src/test/safe-next.test.ts`          | 6       | passed                   |
 | E2E       | `tests/e2e/journey.spec.ts`                  | 3       | passed                   |
-| **Total** |                                              | **107** | **107 passed, 0 failed** |
+| E2E       | `tests/e2e/responsive.spec.ts`               | 6       | passed                   |
+| **Total** |                                              | **113** | **113 passed, 0 failed** |
 
 `npm run typecheck` and `npm run lint` report no errors. `prettier --check` is clean.
 
@@ -66,6 +67,8 @@ Clean-install check: the sources were copied without `node_modules`, databases o
 **Persistence:** data written through the API is read back through a fresh database connection (API test), and through a brand-new server process after the journey (E2E).
 
 **Frontend:** sign-in validation, server error message, password visibility toggle, redirect to the requested page after sign-in, redirect to sign-in without a session; request list loading, first-run empty, filtered empty, error with retry, search and filter parameters sent to the server, personal empty state on My requests; create form validation, successful create with idempotency key and CSRF header, employee assignee options; request details, notes empty state and history; status change sends the version it read; Start work disabled without an assignee; work controls hidden from non-owners; empty note rejected and valid note added; not-found state; post-login redirect guard rejects off-site and `/\host` paths.
+
+**Responsive layout:** every screen (sign-in, dashboard, all requests, my requests, request page, new request, unassigned, team) is loaded at 320 and 390 px phones, 768 px iPad portrait, 1024 px iPad landscape, 1280 px laptop and 1920 px desktop, and the test fails if the page scrolls sideways at any of them. Below 768 px tables become card lists; from 768 px less important table columns fold away instead of scrolling. Inputs use 16 px text on phones so iOS Safari does not zoom in.
 
 **End-to-end:** the ten steps from the brief (manager signs in, creates, assigns; employee signs in, finds it in My requests, adds a note, starts work, resolves; manager signs in and checks the resolution, note and the four history entries in order), a second employee cannot work on the request, and the data is still there when a new server process opens the same database.
 

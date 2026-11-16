@@ -65,27 +65,55 @@ export function TeamPage() {
         ) : team.data.length === 0 ? (
           <EmptyState icon={<Users />} title="No team members yet" />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-[13px]">
+          <>
+            {/* Phones: one card per person */}
+            <ul className="divide-y divide-line md:hidden">
+              {team.data.map((u) => (
+                <li key={u.id} className="flex flex-col gap-3 px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <MemberName member={u} isMe={u.id === me.id} />
+                    <AccountBadge active={u.isActive} />
+                  </div>
+                  <div className="flex items-center gap-3 text-[13px] text-ink-2">
+                    <WorkloadBar count={u.activeCount} max={maxActive} />
+                    <span className="shrink-0">
+                      active ·{' '}
+                      <span className="tabular font-medium text-ink">{u.resolvedCount}</span>{' '}
+                      resolved
+                    </span>
+                  </div>
+                  {isManager && u.id !== me.id && (
+                    <Button
+                      size="sm"
+                      variant={u.isActive ? 'secondary' : 'primary'}
+                      onClick={() => setTarget(u)}
+                      className="self-start"
+                    >
+                      {u.isActive ? 'Deactivate' : 'Reactivate'}
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+
+            {/* Tablet and up: table that fits without sideways scrolling */}
+            <table className="hidden w-full text-left text-[13px] md:table">
               <thead>
                 <tr className="border-b border-line bg-canvas/60 text-xs text-ink-2">
                   <th scope="col" className="py-2.5 pr-3 pl-4 font-medium">
                     Name
                   </th>
                   <th scope="col" className="px-3 py-2.5 font-medium">
-                    Role
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 font-medium">
                     Account
                   </th>
-                  <th scope="col" className="w-56 px-3 py-2.5 font-medium">
+                  <th scope="col" className="w-44 px-3 py-2.5 font-medium lg:w-56">
                     Active requests
                   </th>
                   <th scope="col" className="px-3 py-2.5 font-medium">
                     Resolved
                   </th>
                   {isManager && (
-                    <th scope="col" className="px-4 py-2.5">
+                    <th scope="col" className="relative px-4 py-2.5">
                       <span className="sr-only">Actions</span>
                     </th>
                   )}
@@ -93,63 +121,15 @@ export function TeamPage() {
               </thead>
               <tbody className="divide-y divide-line">
                 {team.data.map((u) => (
-                  <tr key={u.id} className={cx(!u.isActive && 'text-ink-3')}>
+                  <tr key={u.id}>
                     <td className="py-3 pr-3 pl-4">
-                      <span className="flex items-center gap-3">
-                        <Avatar
-                          name={u.name}
-                          size="md"
-                          className={cx(!u.isActive && 'opacity-40 grayscale')}
-                        />
-                        <span className="min-w-0">
-                          <span
-                            className={cx(
-                              'block font-medium',
-                              u.isActive ? 'text-ink' : 'text-ink-3',
-                            )}
-                          >
-                            {u.name}
-                            {u.id === me.id && (
-                              <span className="ml-1.5 font-normal text-ink-3">(you)</span>
-                            )}
-                          </span>
-                          <span className="block truncate text-xs text-ink-3">{u.email}</span>
-                        </span>
-                      </span>
-                    </td>
-                    <td className="px-3 py-3">{ROLE_LABEL[u.role]}</td>
-                    <td className="px-3 py-3">
-                      <span
-                        className={cx(
-                          'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
-                          u.isActive ? 'bg-resolved-soft text-resolved' : 'bg-sunken text-ink-3',
-                        )}
-                      >
-                        <span
-                          aria-hidden
-                          className={cx(
-                            'size-1.5 rounded-full',
-                            u.isActive ? 'bg-resolved-dot' : 'bg-ink-3',
-                          )}
-                        />
-                        {u.isActive ? 'Active' : 'Deactivated'}
-                      </span>
+                      <MemberName member={u} isMe={u.id === me.id} />
                     </td>
                     <td className="px-3 py-3">
-                      <span className="flex items-center gap-3">
-                        <span className="tabular w-5 text-right font-medium text-ink">
-                          {u.activeCount}
-                        </span>
-                        <span
-                          aria-hidden
-                          className="h-1.5 flex-1 overflow-hidden rounded-full bg-sunken"
-                        >
-                          <span
-                            className="block h-full origin-left rounded-full bg-progress-dot transition-transform duration-500 ease-out"
-                            style={{ transform: `scaleX(${u.activeCount / maxActive})` }}
-                          />
-                        </span>
-                      </span>
+                      <AccountBadge active={u.isActive} />
+                    </td>
+                    <td className="px-3 py-3">
+                      <WorkloadBar count={u.activeCount} max={maxActive} />
                     </td>
                     <td className="tabular px-3 py-3 font-medium text-ink">{u.resolvedCount}</td>
                     {isManager && (
@@ -169,7 +149,7 @@ export function TeamPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </>
         )}
       </Panel>
 
@@ -199,6 +179,54 @@ export function TeamPage() {
         onClose={() => setTarget(null)}
       />
     </>
+  );
+}
+
+function MemberName({ member: u, isMe }: { member: TeamMember; isMe: boolean }) {
+  return (
+    <span className="flex min-w-0 items-center gap-3">
+      <Avatar name={u.name} size="md" className={cx(!u.isActive && 'opacity-40 grayscale')} />
+      <span className="min-w-0">
+        <span className={cx('block font-medium', u.isActive ? 'text-ink' : 'text-ink-3')}>
+          {u.name}
+          {isMe && <span className="ml-1.5 font-normal text-ink-3">(you)</span>}
+        </span>
+        <span className="block truncate text-xs text-ink-3">
+          {ROLE_LABEL[u.role]} · {u.email}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+function AccountBadge({ active }: { active: boolean }) {
+  return (
+    <span
+      className={cx(
+        'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
+        active ? 'bg-resolved-soft text-resolved' : 'bg-sunken text-ink-3',
+      )}
+    >
+      <span
+        aria-hidden
+        className={cx('size-1.5 rounded-full', active ? 'bg-resolved-dot' : 'bg-ink-3')}
+      />
+      {active ? 'Active' : 'Deactivated'}
+    </span>
+  );
+}
+
+function WorkloadBar({ count, max }: { count: number; max: number }) {
+  return (
+    <span className="flex min-w-0 flex-1 items-center gap-3">
+      <span className="tabular w-5 shrink-0 text-right font-medium text-ink">{count}</span>
+      <span aria-hidden className="h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-sunken">
+        <span
+          className="block h-full origin-left rounded-full bg-progress-dot transition-transform duration-500 ease-out"
+          style={{ transform: `scaleX(${count / max})` }}
+        />
+      </span>
+    </span>
   );
 }
 
