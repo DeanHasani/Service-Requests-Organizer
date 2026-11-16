@@ -284,11 +284,14 @@ function ProgressCard({ progress, children }: { progress: number; children: Reac
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      // border box, not content box: the outline traces the card's outer edge, padding included
-      const box = entry?.borderBoxSize?.[0];
-      if (box) setSize({ w: box.inlineSize, h: box.blockSize });
-    });
+    // Outer edge of the card (padding included), so the outline traces the real border.
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setSize({ w: r.width, h: r.height });
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return; // older browsers: measured once is enough
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
