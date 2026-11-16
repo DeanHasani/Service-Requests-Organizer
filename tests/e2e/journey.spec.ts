@@ -25,7 +25,7 @@ let requestUrl = '';
 test('manager creates and assigns, employee works and resolves, manager verifies', async ({
   page,
 }) => {
-  // 1–2. Manager logs in and creates a request.
+  // Steps 1 and 2: Manager logs in and creates a request.
   await signIn(page, 'growin@deskflow.test');
   await page.getByRole('link', { name: 'New request' }).first().click();
   await page.getByLabel('Title').fill(TITLE);
@@ -49,7 +49,7 @@ test('manager creates and assigns, employee works and resolves, manager verifies
   await expect(page.getByText('assigned the request to Dean Hasani')).toBeVisible();
   await signOut(page);
 
-  // 4–5. Employee logs in and finds the request in their queue.
+  // Steps 4 and 5: Employee logs in and finds the request in their queue.
   await signIn(page, 'dean@deskflow.test');
   await page
     .getByRole('navigation', { name: 'Main' })
@@ -75,7 +75,7 @@ test('manager creates and assigns, employee works and resolves, manager verifies
   await expect(page.getByText('Resolved by Dean Hasani')).toBeVisible();
   await signOut(page);
 
-  // 9–10. Manager verifies the completed request and its history.
+  // Steps 9 and 10: Manager verifies the completed request and its history.
   await signIn(page, 'growin@deskflow.test');
   await page.goto(requestUrl);
   await expect(page.getByRole('heading', { name: TITLE })).toBeVisible();

@@ -6,7 +6,7 @@ Tests sit at the public boundaries of the system rather than its internals:
 
 - **API (Supertest + Vitest).** Every business rule, permission and error path goes through real HTTP calls against the real Express app and a real SQLite database. These are the most valuable tests, because the server is where the rules are enforced.
 - **Frontend (React Testing Library + Vitest).** The real app (router, auth provider, query client, pages) renders in jsdom with `fetch` stubbed by a small route table. Tests interact through labels and roles the way a user would.
-- **End-to-end (Playwright).** The full manager → employee → manager journey runs in Chromium against a running API and web app on their own database.
+- **End-to-end (Playwright).** The full journey from manager to employee and back to manager runs in Chromium against a running API and web app on their own database.
 
 Each layer runs on an isolated database, so tests never touch `dev.db`:
 
@@ -35,14 +35,14 @@ Last full run: 16 November 2026, Windows 11, Node 25.8.2, Chromium (Playwright 1
 | Suite     | File                                         | Tests   | Result                   |
 | --------- | -------------------------------------------- | ------- | ------------------------ |
 | API       | `server/tests/auth.test.ts`                  | 17      | passed                   |
-| API       | `server/tests/requests.test.ts`              | 32      | passed                   |
+| API       | `server/tests/requests.test.ts`              | 33      | passed                   |
 | API       | `server/tests/status.test.ts`                | 11      | passed                   |
 | API       | `server/tests/notes-and-permissions.test.ts` | 18      | passed                   |
-| Frontend  | `client/src/test/app.test.tsx`               | 20      | passed                   |
+| Frontend  | `client/src/test/app.test.tsx`               | 21      | passed                   |
 | Frontend  | `client/src/test/safe-next.test.ts`          | 6       | passed                   |
 | E2E       | `tests/e2e/journey.spec.ts`                  | 3       | passed                   |
 | E2E       | `tests/e2e/responsive.spec.ts`               | 6       | passed                   |
-| **Total** |                                              | **113** | **113 passed, 0 failed** |
+| **Total** |                                              | **115** | **115 passed, 0 failed** |
 
 `npm run typecheck` and `npm run lint` report no errors. `prettier --check` is clean.
 
@@ -54,9 +54,9 @@ Clean-install check: the sources were copied without `node_modules`, databases o
 
 **Request creation:** success with `SR-000001` reference, `OPEN` status and a `CREATED` activity; default priority; client-supplied status ignored; missing fields with per-field errors; whitespace-only fields; invalid priority; invalid source; nonexistent assignee; deactivated assignee; initial assignment logged; employee can assign only themselves; unique references under 8 concurrent creates; repeated submission key returns the same request; two simultaneous duplicate submissions create one request.
 
-**Request management:** retrieve; 404 for missing, 400 for invalid ids; edit logs one activity per changed field (unchanged fields ignored); empty edit rejected; stale edit rejected with 409 and the first edit kept; search by title, requester, description and reference; filters by status, priority, source, assignee (`me`, `none`, id); priority sorts by urgency; date sorting both ways; pagination totals; invalid query parameters rejected; assign → reassign → unassign with matching history; deactivated assignee refused; unassigning an in-progress request moves it to Open; employee claim.
+**Request management:** retrieve; 404 for missing, 400 for invalid ids; edit logs one activity per changed field (unchanged fields ignored); empty edit rejected; stale edit rejected with 409 and the first edit kept; search by title, requester, description and reference; filters by status, priority, source, assignee (`me`, `none`, id); priority sorts by urgency; date sorting both ways; pagination totals; invalid query parameters rejected; assign, then reassign, then unassign with matching history; deactivated assignee refused; a manager can never be made the assignee; unassigning an in-progress request moves it to Open; employee claim.
 
-**Status:** OPEN → IN_PROGRESS → RESOLVED with resolver and timestamp; OPEN → RESOLVED; RESOLVED → OPEN clears the resolution but keeps history; IN_PROGRESS without an assignee rejected; IN_PROGRESS → OPEN, RESOLVED → IN_PROGRESS and OPEN → OPEN rejected; unknown status rejected; stale status change rejected; resolved requests cannot be edited or reassigned; every change logged with actor, old and new value, and shown in the global feed.
+**Status:** OPEN to IN_PROGRESS to RESOLVED with resolver and timestamp; OPEN to RESOLVED; RESOLVED to OPEN clears the resolution but keeps history; IN_PROGRESS without an assignee rejected; IN_PROGRESS to OPEN, RESOLVED to IN_PROGRESS and OPEN to OPEN rejected; unknown status rejected; stale status change rejected; resolved requests cannot be edited or reassigned; every change logged with actor, old and new value, and shown in the global feed.
 
 **Notes:** created with the signed-in user as author (client-supplied author ignored), whitespace trimmed; empty or missing content rejected; nonexistent request returns 404; employees can only note their own requests.
 

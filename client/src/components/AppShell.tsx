@@ -83,7 +83,9 @@ function SidebarContent() {
       <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5 px-3 pt-2">
         <NavItem to="/" end icon={LayoutGrid} label="Dashboard" />
         <NavItem to="/requests" icon={Inbox} label="All requests" />
-        <NavItem to="/my" icon={ListTodo} label="My requests" count={mine} />
+        {user.role === 'EMPLOYEE' && (
+          <NavItem to="/my" icon={ListTodo} label="My requests" count={mine} />
+        )}
         <NavItem to="/unassigned" icon={UserRound} label="Unassigned" count={summary?.unassigned} />
         <NavItem to="/team" icon={Users} label="Team" />
         <NavLink

@@ -1,4 +1,4 @@
-# DESKFLOW — Project Plan
+# DESKFLOW project plan
 
 Internal service request tracker. One place to register, assign, track and resolve requests that arrive by phone, email or message.
 
@@ -56,7 +56,7 @@ Status legend: `[x]` done, `[ ]` open.
 
 ### Phase 5: Integration
 
-- [x] Session expiry handling in client (401 → sign-in with return path)
+- [x] Session expiry handling in client (a 401 sends the user to sign-in, then back to the same page)
 - [x] 409 conflict handling (toast + refetch)
 - [x] Production build served by the API (same origin)
 
@@ -64,7 +64,7 @@ Status legend: `[x]` done, `[ ]` open.
 
 - [x] Server: auth, creation, management, status, notes, authorization (78 tests)
 - [x] Client: forms, states, filters, details, redirect guard (26 tests)
-- [x] Playwright: full manager → employee → manager journey (3 tests)
+- [x] Playwright: full journey from manager to employee and back to manager (3 tests)
 - [x] Persistence after restart
 
 ### Phase 7: Security and quality review

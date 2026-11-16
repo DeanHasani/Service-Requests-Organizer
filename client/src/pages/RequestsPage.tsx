@@ -26,6 +26,7 @@ import {
   type SortField,
 } from '@deskflow/shared';
 import { useAssignees, useRequests } from '../lib/queries';
+import { useCurrentUser } from '../lib/auth';
 import { errorMessage } from '../lib/api';
 import { cx, formatDateTime, formatShortDate } from '../lib/format';
 import {
@@ -99,6 +100,7 @@ export function RequestsPage({ scope }: { scope: Scope }) {
   };
   const list = useRequests(query);
   const assignees = useAssignees();
+  const isManager = useCurrentUser().role === 'MANAGER';
   const hasFilters = FILTER_KEYS.some((k) => params.get(k));
 
   const clear = () => {
@@ -196,7 +198,7 @@ export function RequestsPage({ scope }: { scope: Scope }) {
               className="w-full sm:w-40"
             >
               <option value="">Assignee</option>
-              <option value="me">Assigned to me</option>
+              {!isManager && <option value="me">Assigned to me</option>}
               <option value="none">Unassigned</option>
               {assignees.data?.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -560,7 +562,7 @@ export function Pagination({
       className="flex items-center justify-between gap-4 border-t border-line px-4 py-3 text-[13px] text-ink-2"
     >
       <span className="tabular">
-        {from}–{to} of {total}
+        {from} to {to} of {total}
       </span>
       <span className="flex items-center gap-2">
         <span className="tabular hidden sm:inline">

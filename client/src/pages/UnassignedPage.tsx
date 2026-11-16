@@ -150,7 +150,7 @@ function UnassignedRow({ request: r }: { request: ServiceRequest }) {
             <option value="">Choose a person…</option>
             {assignees.data?.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.name} · {u.activeCount} active
+                {u.name} ({u.activeCount} active)
               </option>
             ))}
           </Select>

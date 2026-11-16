@@ -17,15 +17,17 @@
 | Edit details (title, description, requester, source, priority) | Any request | Only requests assigned to them         |
 | Change status (incl. resolve / reopen)                         | Any request | Only requests assigned to them         |
 | Add a note                                                     | Any request | Only requests assigned to them         |
-| Assign, reassign, unassign                                     | Any request | No                                     |
-| Claim an unassigned request                                    | Yes         | Yes (assigns it to themselves)         |
+| Assign, reassign, unassign (to employees only)                 | Any request | No                                     |
+| Be the assignee of a request                                   | No          | Yes                                    |
+| Claim an unassigned request                                    | No          | Yes (assigns it to themselves)         |
 | View team and workload                                         | Yes         | Yes (read-only)                        |
 | Create users, activate / deactivate                            | Yes         | No                                     |
 
 Decisions where the brief was open:
 
 - **Employees can change priority** on their own requests. The brief lists "change priority" under managers but also says employees can "update requests assigned to them". Priority is part of the request, so it follows the same rule.
-- **Employees can claim unassigned requests.** The core problem is "nobody knows who is responsible". Letting someone say "mine" without waiting for a manager fixes that directly. They still cannot take a request from a colleague.
+- **Managers are never assignees.** The manager triages and hands out work; only active employees can own a request. The server rejects assigning a manager, and the assignee pickers list employees only. Because of this, managers have no My requests page and their dashboard shows the team's workload instead of their own.
+   The core problem is "nobody knows who is responsible". Letting someone say "mine" without waiting for a manager fixes that directly. They still cannot take a request from a colleague.
 - **Employees can reopen** their own resolved requests, since reopening is a status change.
 - **Team page is visible to employees** (read-only) so they can see who is busy. Account management controls are manager-only.
 
@@ -41,7 +43,7 @@ OPEN ──▶ IN_PROGRESS ──▶ RESOLVED
 
 - New requests are always `OPEN`.
 - `IN_PROGRESS` needs an active assignee.
-- `IN_PROGRESS → OPEN` is not allowed (not in the brief). Unassigning an in-progress request moves it back to `OPEN` automatically, since in-progress without an owner would break the rule above.
+- Moving from `IN_PROGRESS` back to `OPEN` is not allowed (not in the brief). Unassigning an in-progress request moves it back to `OPEN` automatically, since in-progress without an owner would break the rule above.
 - Resolving stores `resolvedBy` and `resolvedAt`. Reopening clears both; the activity log keeps the old values.
 - A resolved request cannot be edited or reassigned until it is reopened. Notes are still allowed, so people can add follow-up context.
 

@@ -360,12 +360,14 @@ function PropertiesPanel({
         <Row label="Updated">
           <time dateTime={r.updatedAt}>{formatDateTime(r.updatedAt)}</time>
         </Row>
-        <Row label="Resolved by">{r.resolvedBy?.name ?? <span className="text-ink-3">—</span>}</Row>
+        <Row label="Resolved by">
+          {r.resolvedBy?.name ?? <span className="text-ink-3">Not yet</span>}
+        </Row>
         <Row label="Resolved">
           {r.resolvedAt ? (
             <time dateTime={r.resolvedAt}>{formatDateTime(r.resolvedAt)}</time>
           ) : (
-            <span className="text-ink-3">—</span>
+            <span className="text-ink-3">Not yet</span>
           )}
         </Row>
       </dl>

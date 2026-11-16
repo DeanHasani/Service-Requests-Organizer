@@ -15,7 +15,7 @@ const setStatus = (c: Client, id: number, status: string, version: number) =>
   c.patch(`/api/requests/${id}/status`, { status, version });
 
 describe('status lifecycle', () => {
-  it('OPEN → IN_PROGRESS → RESOLVED, recording who resolved it and when', async () => {
+  it('OPEN to IN_PROGRESS to RESOLVED, recording who resolved it and when', async () => {
     const r = await createRequest(mia, { assignedToId: users.ann.id });
     const started = await setStatus(ann, r.id, 'IN_PROGRESS', 0);
     expect(started.status).toBe(200);
@@ -30,14 +30,14 @@ describe('status lifecycle', () => {
     expect(new Date(resolved.body.data.resolvedAt).getTime()).toBeGreaterThanOrEqual(before - 1000);
   });
 
-  it('OPEN → RESOLVED directly', async () => {
+  it('OPEN to RESOLVED directly', async () => {
     const r = await createRequest(mia);
     const res = await setStatus(mia, r.id, 'RESOLVED', 0);
     expect(res.status).toBe(200);
     expect(res.body.data.resolvedBy.name).toBe('Mia Manager');
   });
 
-  it('RESOLVED → OPEN clears resolution but keeps the history', async () => {
+  it('RESOLVED to OPEN clears resolution but keeps the history', async () => {
     const r = await createRequest(mia);
     await setStatus(mia, r.id, 'RESOLVED', 0);
     const reopened = await setStatus(mia, r.id, 'OPEN', 1);
@@ -68,7 +68,7 @@ describe('status lifecycle', () => {
     ['IN_PROGRESS', 'OPEN'],
     ['RESOLVED', 'IN_PROGRESS'],
     ['OPEN', 'OPEN'],
-  ])('rejects %s → %s', async (from, to) => {
+  ])('rejects %s to %s', async (from, to) => {
     const r = await createRequest(mia, { assignedToId: users.ann.id });
     let version = 0;
     if (from !== 'OPEN') {

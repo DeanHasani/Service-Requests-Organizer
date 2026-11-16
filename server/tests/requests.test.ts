@@ -79,6 +79,22 @@ describe('request creation', () => {
     expect(res.body.error.message).toMatch(/deactivated/);
   });
 
+  it('refuses to make a manager the assignee, on create and on reassignment', async () => {
+    const res = await mia.post('/api/requests', validRequest({ assignedToId: users.manager.id }));
+    expect(res.status).toBe(422);
+    expect(res.body.error).toMatchObject({
+      code: 'INVALID_ASSIGNEE',
+      message: 'Managers assign requests but cannot be assigned them',
+    });
+    const r = await createRequest(mia);
+    const assign = await mia.patch(`/api/requests/${r.id}/assignment`, {
+      assignedToId: users.manager.id,
+      version: 0,
+    });
+    expect(assign.status).toBe(422);
+    expect((await mia.get(`/api/requests/${r.id}`)).body.data.assignedTo).toBeNull();
+  });
+
   it('records the initial assignment', async () => {
     const res = await mia.post('/api/requests', validRequest({ assignedToId: users.ann.id }));
     expect(res.body.data.assignedTo).toEqual({ id: users.ann.id, name: 'Ann Employee' });
@@ -148,7 +164,7 @@ describe('request management', () => {
     const res = await mia.patch(`/api/requests/${created.id}`, {
       title: 'Printer offline (finance)',
       priority: 'URGENT',
-      description: 'The 2nd floor printer shows offline.', // unchanged → no activity
+      description: 'The 2nd floor printer shows offline.', // unchanged, so no activity
       version: 0,
     });
     expect(res.status).toBe(200);

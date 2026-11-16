@@ -63,11 +63,12 @@ export const useDashboard = () =>
 export const useTeam = () =>
   useQuery({ queryKey: keys.team, queryFn: () => api.get<TeamMember[]>('/users') });
 
-/** Active users only, for assignee pickers. */
+/** Active employees only, for assignee pickers (managers assign work, they don't take it). */
 export const useAssignees = () =>
   useQuery({
     queryKey: [...keys.team, 'active'],
     queryFn: () => api.get<TeamMember[]>('/users?active=true'),
+    select: (users) => users.filter((u) => u.role === 'EMPLOYEE'),
     staleTime: 60_000,
   });
 

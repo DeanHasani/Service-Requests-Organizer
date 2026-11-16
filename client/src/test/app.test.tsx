@@ -193,6 +193,30 @@ describe('create request', () => {
     expect(post.headers['X-CSRF-Token']).toBe('csrf-test');
   });
 
+  it('never offers a manager as an assignee', async () => {
+    const counts = { activeCount: 0, resolvedCount: 0 };
+    mockApi({
+      ...signedInAs(manager),
+      'GET /users': {
+        body: {
+          data: [
+            { ...manager, ...counts },
+            { ...employee, ...counts },
+          ],
+        },
+      },
+    });
+    renderApp('/requests/new');
+    const select = await screen.findByLabelText(/Assignee/);
+    await waitFor(() =>
+      expect(
+        within(select)
+          .getAllByRole('option')
+          .map((o) => o.textContent),
+      ).toEqual(['Unassigned', 'Dean Hasani']),
+    );
+  });
+
   it('only offers employees themselves as assignee', async () => {
     mockApi({ ...signedInAs(employee) });
     renderApp('/requests/new');

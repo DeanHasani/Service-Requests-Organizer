@@ -77,7 +77,7 @@ export function TeamPage() {
                   <div className="flex items-center gap-3 text-[13px] text-ink-2">
                     <WorkloadBar count={u.activeCount} max={maxActive} />
                     <span className="shrink-0">
-                      active ·{' '}
+                      active,{' '}
                       <span className="tabular font-medium text-ink">{u.resolvedCount}</span>{' '}
                       resolved
                     </span>
@@ -192,7 +192,7 @@ function MemberName({ member: u, isMe }: { member: TeamMember; isMe: boolean }) 
           {isMe && <span className="ml-1.5 font-normal text-ink-3">(you)</span>}
         </span>
         <span className="block truncate text-xs text-ink-3">
-          {ROLE_LABEL[u.role]} · {u.email}
+          {ROLE_LABEL[u.role]}, {u.email}
         </span>
       </span>
     </span>

@@ -9,7 +9,7 @@ describe('post-login redirect guard', () => {
     ['https://evil.example', '/'],
     ['//evil.example', '/'],
     ['/\\evil.example', '/'],
-  ])('%s → %s', (input, expected) => {
+  ])('%s becomes %s', (input, expected) => {
     expect(safeNext(input)).toBe(expected);
   });
 });

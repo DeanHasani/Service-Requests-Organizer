@@ -72,10 +72,10 @@ const REQUESTS: Seed[] = [
     daysAgo: 2,
   },
   {
-    title: 'Access setup for new hire — Jana Petrović',
+    title: 'Access setup for new hire: Jana Petrović',
     description:
       'Jana starts Monday in Customer Success. Needs email account, CRM login, shared drive access to "CS Team", and a laptop from stock.',
-    requester: ['HR — Ivana Novak', 'hr@northwind.example'],
+    requester: ['Ivana Novak (HR)', 'hr@northwind.example'],
     source: 'EMAIL',
     priority: 'HIGH',
     status: 'IN_PROGRESS',
@@ -101,7 +101,7 @@ const REQUESTS: Seed[] = [
   {
     title: 'Wi-Fi drops in meeting room B',
     description:
-      'Video calls in meeting room B disconnect every 10–15 minutes. Other rooms are fine. Happens on both laptops and phones.',
+      'Video calls in meeting room B disconnect every 10 to 15 minutes. Other rooms are fine. Happens on both laptops and phones.',
     requester: ['Grace Kim', 'Teams message'],
     source: 'MESSAGE',
     priority: 'URGENT',
@@ -113,7 +113,7 @@ const REQUESTS: Seed[] = [
     title: 'Quarterly maintenance for server room AC',
     description:
       'Book the quarterly service visit for the server room air conditioning unit. Last visit was in August.',
-    requester: ['Facilities — Tom Becker', '+383 49 330 112'],
+    requester: ['Tom Becker (Facilities)', '+383 49 330 112'],
     source: 'PHONE',
     priority: 'LOW',
     status: 'RESOLVED',
@@ -176,7 +176,7 @@ const REQUESTS: Seed[] = [
     title: 'VPN disconnects when working from home',
     description:
       'VPN client drops every 30 minutes for the sales team working remotely. Started after the firewall firmware update.',
-    requester: ['Sales — Jonas Frei', 'jonas.frei@northwind.example'],
+    requester: ['Jonas Frei (Sales)', 'jonas.frei@northwind.example'],
     source: 'EMAIL',
     priority: 'URGENT',
     status: 'IN_PROGRESS',
@@ -213,7 +213,7 @@ const REQUESTS: Seed[] = [
     title: 'Restore deleted contract file',
     description:
       'A signed contract PDF was deleted from "Legal/Clients/Mercer" yesterday afternoon. Needs restoring from backup today.',
-    requester: ['Legal — Hannah Ortiz', '+383 45 771 020'],
+    requester: ['Hannah Ortiz (Legal)', '+383 45 771 020'],
     source: 'PHONE',
     priority: 'URGENT',
     status: 'RESOLVED',
@@ -238,7 +238,7 @@ const REQUESTS: Seed[] = [
   {
     title: 'Badge reader at side entrance not working',
     description: 'Staff badges are not recognised at the side entrance. Main entrance works.',
-    requester: ['Facilities — Tom Becker', '+383 49 330 112'],
+    requester: ['Tom Becker (Facilities)', '+383 49 330 112'],
     source: 'PHONE',
     priority: 'HIGH',
     status: 'OPEN',

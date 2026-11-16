@@ -48,7 +48,7 @@ export function DashboardPage() {
           />
         </Panel>
       ) : (
-        <StatusLedger data={summary.data} />
+        <StatusLedger data={summary.data} isManager={user.role === 'MANAGER'} />
       )}
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <RecentRequests />
@@ -58,7 +58,7 @@ export function DashboardPage() {
   );
 }
 
-function StatusLedger({ data }: { data?: DashboardSummary }) {
+function StatusLedger({ data, isManager }: { data?: DashboardSummary; isManager: boolean }) {
   const cells = [
     { label: 'Total requests', value: data?.total, to: '/requests' },
     { label: 'Open', value: data?.open, to: '/requests?status=OPEN', dot: 'bg-open' },
@@ -82,7 +82,22 @@ function StatusLedger({ data }: { data?: DashboardSummary }) {
     },
   ];
   const total = Math.max(1, data?.total ?? 1);
-  const mineActive = data ? data.mine.open + data.mine.inProgress : undefined;
+  // Managers never own requests, so their card shows what the team is carrying instead.
+  const card = !data
+    ? null
+    : isManager
+      ? {
+          to: '/team',
+          label: 'Team workload',
+          value: data.open - data.unassigned + data.inProgress,
+          detail: `${data.inProgress} in progress, ${data.open - data.unassigned} waiting to start`,
+        }
+      : {
+          to: '/my',
+          label: 'My workload',
+          value: data.mine.open + data.mine.inProgress,
+          detail: `${data.mine.inProgress} in progress, ${data.mine.resolved} resolved by you`,
+        };
   const pressing = data ? data.byPriority.URGENT + data.byPriority.HIGH : 0;
 
   return (
@@ -109,21 +124,20 @@ function StatusLedger({ data }: { data?: DashboardSummary }) {
           </Link>
         ))}
         <Link
-          to="/my"
+          to={card?.to ?? (isManager ? '/team' : '/my')}
           className="col-span-2 flex flex-col justify-between gap-2 bg-navy px-5 py-4 text-navy-ink transition-colors hover:bg-navy-2 sm:col-span-3 lg:col-span-1"
         >
           <span className="flex items-center justify-between text-[13px]">
-            My workload <ArrowUpRight className="size-4 opacity-70" aria-hidden />
+            {isManager ? 'Team workload' : 'My workload'}{' '}
+            <ArrowUpRight className="size-4 opacity-70" aria-hidden />
           </span>
-          {data ? (
+          {card ? (
             <span className="text-[13px]">
               <span className="tabular text-[26px] leading-none font-semibold tracking-[-0.02em] text-white">
-                {mineActive}
+                {card.value}
               </span>{' '}
               active
-              <span className="mt-1.5 block text-xs text-navy-ink-dim">
-                {data.mine.inProgress} in progress · {data.mine.resolved} resolved by you
-              </span>
+              <span className="mt-1.5 block text-xs text-navy-ink-dim">{card.detail}</span>
             </span>
           ) : (
             <Skeleton className="h-6 w-24 opacity-20" />
@@ -225,9 +239,8 @@ function RecentRequests() {
                   <span className="block truncate text-[13.5px] font-medium text-ink">
                     {r.title}
                   </span>
-                  <span className="mt-0.5 flex items-center gap-2 text-xs whitespace-nowrap text-ink-3">
+                  <span className="mt-0.5 flex items-center gap-3 text-xs whitespace-nowrap text-ink-3">
                     <RequestRef value={r.referenceNumber} />
-                    <span aria-hidden>·</span>
                     <span>updated {timeAgo(r.updatedAt)}</span>
                   </span>
                 </span>

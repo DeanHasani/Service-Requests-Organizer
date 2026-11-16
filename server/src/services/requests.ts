@@ -42,12 +42,15 @@ async function load(id: number, tx: Tx | typeof prisma = prisma) {
   return row;
 }
 
+/** Only active employees can own requests; managers triage and assign, they don't take work. */
 async function activeAssignee(tx: Tx, id: number) {
   const user = await tx.user.findUnique({
     where: { id },
-    select: { id: true, name: true, isActive: true },
+    select: { id: true, name: true, isActive: true, role: true },
   });
   if (!user) throw rule('INVALID_ASSIGNEE', 'The selected assignee does not exist');
+  if (user.role !== 'EMPLOYEE')
+    throw rule('INVALID_ASSIGNEE', 'Managers assign requests but cannot be assigned them');
   if (!user.isActive)
     throw rule('INVALID_ASSIGNEE', `${user.name} is deactivated and cannot be assigned`);
   return user;

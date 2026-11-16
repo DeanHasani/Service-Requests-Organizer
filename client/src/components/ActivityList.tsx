@@ -97,7 +97,7 @@ export function ActivityList({
                 {showsValues(a) && (a.oldValue || a.newValue) && (
                   <p className="mt-1 truncate text-xs text-ink-3">
                     <span className="line-through decoration-ink-3/50">{a.oldValue}</span>
-                    {' → '}
+                    {' to '}
                     <span className="text-ink-2">{a.newValue}</span>
                   </p>
                 )}
