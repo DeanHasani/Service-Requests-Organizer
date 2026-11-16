@@ -3,6 +3,10 @@ import { Check } from 'lucide-react';
 import { STATUS_LABEL, STATUSES, type Status } from '@deskflow/shared';
 import { cx } from '../lib/format';
 
+// Empty stops are opaque and match the card, so the track never shows through them.
+const EMPTY_FILL = '#111c30';
+const EMPTY_RING = '#3a4963';
+
 const TONE: Record<Status, string> = {
   OPEN: '#5b7ff0',
   IN_PROGRESS: '#e8a23e',
@@ -57,8 +61,8 @@ export function HeroRail({ at, onPick }: { at: number; onPick: (i: number) => vo
                 <motion.span
                   initial={false}
                   animate={{
-                    backgroundColor: reached ? TONE[s] : 'rgba(255,255,255,0.06)',
-                    borderColor: reached ? TONE[s] : 'rgba(255,255,255,0.22)',
+                    backgroundColor: reached ? TONE[s] : EMPTY_FILL,
+                    borderColor: reached ? TONE[s] : EMPTY_RING,
                     boxShadow: reached ? `0 0 28px -2px ${TONE[s]}` : '0 0 0 0 rgba(0,0,0,0)',
                     transform: current ? 'scale(1)' : 'scale(0.84)',
                   }}

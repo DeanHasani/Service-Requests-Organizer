@@ -84,7 +84,7 @@ export function LoginPage() {
       </div>
 
       <main className="flex items-center justify-center px-4 py-12 sm:px-8">
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-md rounded-[24px] bg-white/55 px-6 py-8 shadow-[0_28px_70px_-28px_rgb(15_27_45/0.28),0_4px_14px_-6px_rgb(15_27_45/0.08)] backdrop-blur-xl sm:px-10 sm:py-11">
           <span className="mb-10 flex items-center gap-2.5 lg:hidden">
             <svg viewBox="0 0 32 32" className="size-8" aria-hidden>
               <rect width="32" height="32" rx="7" fill="#0f1b2d" />
