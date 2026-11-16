@@ -207,7 +207,9 @@ describe('request management', () => {
   });
 
   it('returns 404 when editing a missing request', async () => {
-    expect((await mia.patch('/api/requests/999', { title: 'x', version: 0 })).status).toBe(404);
+    expect((await mia.patch('/api/requests/999', { title: 'New title', version: 0 })).status).toBe(
+      404,
+    );
   });
 });
 
@@ -342,7 +344,7 @@ describe('assignment', () => {
 
   it('moves an in-progress request back to OPEN when unassigned', async () => {
     const r = await createRequest(mia, { assignedToId: users.ann.id });
-    await mia.patch(`/api/requests/${r.id}/status`, { status: 'IN_PROGRESS', version: 0 });
+    await ann.patch(`/api/requests/${r.id}/status`, { status: 'IN_PROGRESS', version: 0 });
     const res = await mia.patch(`/api/requests/${r.id}/assignment`, {
       assignedToId: null,
       version: 1,
@@ -359,5 +361,41 @@ describe('assignment', () => {
     expect(res.status).toBe(200);
     const activity = (await ann.get(`/api/requests/${r.id}/activity`)).body.data;
     expect(activity.at(-1).description).toBe('claimed the request');
+  });
+});
+
+describe('field validation', () => {
+  it.each([
+    ['title', 'ab', 'Title needs at least 3 characters'],
+    ['requesterName', 'A', 'Requester name needs at least 2 characters'],
+    ['description', 'too short', 'Description needs at least 10 characters'],
+    ['requesterContact', 'laura@', 'Enter a valid email address, like name@company.com'],
+    ['requesterContact', '12345', 'A phone number has 6 to 15 digits'],
+    ['requesterContact', '+383 44 abc', 'A phone number has 6 to 15 digits'],
+    ['requesterContact', 'ext. 1', 'An extension is 2 to 6 digits'],
+    ['requesterContact', 'Teams message', 'A phone number has 6 to 15 digits'],
+  ])('rejects %s = %j', async (field, value, message) => {
+    const res = await mia.post('/api/requests', validRequest({ [field]: value }));
+    expect(res.status).toBe(400);
+    expect(res.body.error.details[field]).toEqual([message]);
+  });
+
+  it.each(['laura@example.com', '+383 44 218 905', '044218905', 'ext. 214'])(
+    'accepts the contact %j',
+    async (requesterContact) => {
+      expect((await mia.post('/api/requests', validRequest({ requesterContact }))).status).toBe(
+        201,
+      );
+    },
+  );
+
+  it('applies the same rules when editing', async () => {
+    const r = await createRequest(mia);
+    const res = await mia.patch(`/api/requests/${r.id}`, {
+      requesterContact: 'call me',
+      version: 0,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error.details.requesterContact).toEqual(['A phone number has 6 to 15 digits']);
   });
 });

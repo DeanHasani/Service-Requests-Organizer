@@ -102,7 +102,7 @@ const REQUESTS: Seed[] = [
     title: 'Wi-Fi drops in meeting room B',
     description:
       'Video calls in meeting room B disconnect every 10 to 15 minutes. Other rooms are fine. Happens on both laptops and phones.',
-    requester: ['Grace Kim', 'Teams message'],
+    requester: ['Grace Kim', 'grace.kim@northwind.example'],
     source: 'MESSAGE',
     priority: 'URGENT',
     status: 'OPEN',
@@ -164,7 +164,7 @@ const REQUESTS: Seed[] = [
     title: 'Order replacement keyboard and mouse',
     description:
       'Keyboard has sticky keys after a coffee spill. Wireless mouse battery cover is broken.',
-    requester: ['Lea Weber', 'Slack DM'],
+    requester: ['Lea Weber', 'lea.weber@northwind.example'],
     source: 'MESSAGE',
     priority: 'LOW',
     status: 'RESOLVED',

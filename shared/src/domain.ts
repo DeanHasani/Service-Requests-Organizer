@@ -60,7 +60,7 @@ export function formatReference(n: number): string {
 type Actor = { id: number; role: Role };
 type Owned = { assignedToId: number | null };
 
-/** Edit details, change status, add notes. Managers: any request. Employees: only their own. */
+/** Add notes. Managers: any request. Employees: only requests assigned to them. */
 export function canWorkOn(user: Actor, request: Owned): boolean {
   return user.role === 'MANAGER' || request.assignedToId === user.id;
 }
@@ -69,4 +69,71 @@ export function canWorkOn(user: Actor, request: Owned): boolean {
 export function canAssign(user: Actor, request: Owned, assigneeId: number | null): boolean {
   if (user.role === 'MANAGER') return true;
   return request.assignedToId === null && assigneeId === user.id;
+}
+
+/** What the request is (title, description, requester, source, priority) is the manager's to change. */
+export function canEditDetails(user: Actor): boolean {
+  return user.role === 'MANAGER';
+}
+
+/**
+ * The assignee does the work: start, resolve, reopen. The manager tracks it and may only
+ * send resolved work back (reopen).
+ */
+export function canChangeStatus(
+  user: Actor,
+  request: Owned & { status: Status },
+  to: Status,
+): boolean {
+  if (user.role === 'MANAGER') return request.status === 'RESOLVED' && to === 'OPEN';
+  return request.assignedToId === user.id;
+}
+
+// ---------- requester contact ----------
+
+export const CONTACT_KINDS = ['phone', 'email', 'extension'] as const;
+export type ContactKind = (typeof CONTACT_KINDS)[number];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const EXT_PREFIX = 'ext. ';
+
+/** Contacts are stored as one string; its shape tells which kind it is. */
+export function contactKind(value: string): ContactKind {
+  if (value.includes('@')) return 'email';
+  if (/^ext\.?\s*/i.test(value)) return 'extension';
+  return 'phone';
+}
+
+/** The part a person types, without the stored prefix. */
+export function contactInput(kind: ContactKind, value: string): string {
+  return kind === 'extension' ? value.replace(/^ext\.?\s*/i, '') : value;
+}
+
+/** Builds the stored value from what was typed. */
+export function formatContact(kind: ContactKind, typed: string): string {
+  const v = typed.trim();
+  if (!v) return '';
+  return kind === 'extension' ? EXT_PREFIX + v : v;
+}
+
+/** Keeps only characters that can belong to this kind of contact. */
+export function sanitizeContact(kind: ContactKind, typed: string): string {
+  if (kind === 'phone') return typed.replace(/[^\d+ ]/g, '').replace(/(?!^)\+/g, '');
+  if (kind === 'extension') return typed.replace(/\D/g, '').slice(0, 6);
+  return typed.replace(/\s/g, '');
+}
+
+/** Null when valid, otherwise a message saying what is wrong. */
+export function contactError(value: string): string | null {
+  const kind = contactKind(value);
+  if (kind === 'email') {
+    return EMAIL_RE.test(value) ? null : 'Enter a valid email address, like name@company.com';
+  }
+  if (kind === 'extension') {
+    return /^ext\. \d{2,6}$/.test(value) ? null : 'An extension is 2 to 6 digits';
+  }
+  const digits = value.replace(/\D/g, '').length;
+  return /^\+?[\d ]+$/.test(value) && digits >= 6 && digits <= 15
+    ? null
+    : 'A phone number has 6 to 15 digits';
 }

@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -13,7 +13,9 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import {
-  canAssign,
+  canChangeStatus,
+  canEditDetails,
+  canTransition,
   canWorkOn,
   noteSchema,
   PRIORITIES,
@@ -43,6 +45,8 @@ import { ErrorPage, ErrorState, errorKind } from '../components/errors';
 import { ActivitySkeleton, NotesSkeleton, RequestDetailSkeleton } from '../components/skeletons';
 import { formatDateTime, timeAgo } from '../lib/format';
 import { ActivityList } from '../components/ActivityList';
+import { ContactField } from '../components/ContactField';
+import { toast } from 'sonner';
 import {
   Avatar,
   Button,
@@ -94,8 +98,8 @@ export function RequestDetailPage() {
 function RequestView({ request: r }: { request: ServiceRequest }) {
   const user = useCurrentUser();
   const [editing, setEditing] = useState(false);
-  const mayWork = canWorkOn(user, { assignedToId: r.assignedTo?.id ?? null });
-  const resolved = r.status === 'RESOLVED';
+  const mayNote = canWorkOn(user, { assignedToId: r.assignedTo?.id ?? null });
+  const mayEdit = canEditDetails(user) && r.status !== 'RESOLVED';
 
   return (
     <>
@@ -117,44 +121,63 @@ function RequestView({ request: r }: { request: ServiceRequest }) {
             {r.title}
           </h1>
         </div>
-        {mayWork && !resolved && (
+        {mayEdit && (
           <Button onClick={() => setEditing(true)}>
-            <PencilLine className="size-4" aria-hidden /> Edit
+            <PencilLine className="size-4" aria-hidden /> Edit details
           </Button>
         )}
       </header>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-6">
-          <LifecyclePanel request={r} user={user} mayWork={mayWork} />
+          <LifecyclePanel request={r} user={user} />
           <Panel>
             <PanelHeader title="Description" />
             <p className="px-4 py-4 text-sm leading-relaxed whitespace-pre-wrap text-ink">
               {r.description}
             </p>
           </Panel>
-          <NotesPanel request={r} mayWork={mayWork} />
+          <NotesPanel request={r} mayWork={mayNote} />
           <ActivityPanel requestId={r.id} />
         </div>
-        <PropertiesPanel request={r} user={user} mayWork={mayWork} />
+        <PropertiesPanel request={r} user={user} />
       </div>
 
-      <EditDialog request={r} open={editing} onClose={() => setEditing(false)} />
+      {mayEdit && <EditDialog request={r} open={editing} onClose={() => setEditing(false)} />}
     </>
   );
 }
 
 // ---------- Lifecycle ----------
 
-function LifecyclePanel({
-  request: r,
-  user,
-  mayWork,
-}: {
-  request: ServiceRequest;
-  user: User;
-  mayWork: boolean;
-}) {
+/** What the person looking at the request should know, in one sentence. */
+function statusLine(r: ServiceRequest, user: User): ReactNode {
+  const owner = r.assignedTo;
+  if (r.status === 'RESOLVED' && r.resolvedBy && r.resolvedAt) {
+    return (
+      <>
+        Resolved by <span className="font-medium text-ink">{r.resolvedBy.name}</span>{' '}
+        <time dateTime={r.resolvedAt} title={formatDateTime(r.resolvedAt)}>
+          {timeAgo(r.resolvedAt)}
+        </time>
+      </>
+    );
+  }
+  if (!owner) {
+    return user.role === 'MANAGER'
+      ? 'Nobody owns this yet. Choose an assignee in Details.'
+      : 'Nobody owns this yet. Assign it to yourself to start.';
+  }
+  if (owner.id === user.id) {
+    return r.status === 'OPEN'
+      ? 'Assigned to you. Start work when you pick it up.'
+      : 'You are working on this. Resolve it when it is done.';
+  }
+  const name = <span className="font-medium text-ink">{owner.name}</span>;
+  return r.status === 'OPEN' ? <>Waiting for {name} to start.</> : <>{name} is working on it.</>;
+}
+
+function LifecyclePanel({ request: r, user }: { request: ServiceRequest; user: User }) {
   const change = useChangeStatus(r.id);
   const assign = useAssign(r.id);
   const [confirmReopen, setConfirmReopen] = useState(false);
@@ -172,11 +195,9 @@ function LifecyclePanel({
     }
   };
 
-  const canClaim =
-    canAssign(user, { assignedToId: r.assignedTo?.id ?? null }, user.id) &&
-    !r.assignedTo &&
-    r.status !== 'RESOLVED';
-  const noAssignee = !r.assignedTo;
+  const owned = { assignedToId: r.assignedTo?.id ?? null, status: r.status };
+  const may = (to: Status) => canTransition(r.status, to) && canChangeStatus(user, owned, to);
+  const canClaim = user.role === 'EMPLOYEE' && !r.assignedTo && r.status !== 'RESOLVED';
 
   return (
     <Panel>
@@ -185,29 +206,10 @@ function LifecyclePanel({
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-canvas/50 px-4 py-3 sm:px-6">
         <p className="text-[13px] text-ink-2" aria-live="polite">
-          {r.status === 'RESOLVED' && r.resolvedBy && r.resolvedAt ? (
-            <>
-              Resolved by <span className="font-medium text-ink">{r.resolvedBy.name}</span>{' '}
-              <time dateTime={r.resolvedAt} title={formatDateTime(r.resolvedAt)}>
-                {timeAgo(r.resolvedAt)}
-              </time>
-            </>
-          ) : !mayWork ? (
-            r.assignedTo ? (
-              <>Only {r.assignedTo.name} or a manager can update this request.</>
-            ) : (
-              <>Unassigned. Claim it to start working on it.</>
-            )
-          ) : r.status === 'OPEN' && noAssignee ? (
-            'Assign someone before starting work.'
-          ) : r.status === 'OPEN' ? (
-            'Waiting to be started.'
-          ) : (
-            'Work in progress.'
-          )}
+          {statusLine(r, user)}
         </p>
         <div className="flex flex-wrap gap-2">
-          {canClaim && !mayWork && (
+          {canClaim && (
             <Button
               variant="primary"
               size="sm"
@@ -217,17 +219,16 @@ function LifecyclePanel({
               <Hand className="size-3.5" aria-hidden /> Assign to me
             </Button>
           )}
-          {mayWork && r.status === 'OPEN' && (
+          {may('IN_PROGRESS') && (
             <Button
               size="sm"
               onClick={() => void go('IN_PROGRESS')}
-              disabled={noAssignee}
               loading={pending === 'IN_PROGRESS'}
             >
               <PlayCircle className="size-3.5" aria-hidden /> Start work
             </Button>
           )}
-          {mayWork && r.status !== 'RESOLVED' && (
+          {may('RESOLVED') && (
             <Button
               variant="primary"
               size="sm"
@@ -237,7 +238,7 @@ function LifecyclePanel({
               <CheckCircle2 className="size-3.5" aria-hidden /> Resolve
             </Button>
           )}
-          {mayWork && r.status === 'RESOLVED' && (
+          {may('OPEN') && (
             <Button size="sm" onClick={() => setConfirmReopen(true)}>
               <RotateCcw className="size-3.5" aria-hidden /> Reopen
             </Button>
@@ -247,7 +248,11 @@ function LifecyclePanel({
       <ConfirmDialog
         open={confirmReopen}
         title={`Reopen ${r.referenceNumber}?`}
-        body="It goes back to Open and the current resolution is cleared. The history keeps a record of who resolved it."
+        body={
+          r.assignedTo && r.assignedTo.id !== user.id
+            ? `It goes back to Open so ${r.assignedTo.name} can pick it up again. The history keeps a record of the earlier resolution.`
+            : 'It goes back to Open and the current resolution is cleared. The history keeps a record of who resolved it.'
+        }
         confirmLabel="Reopen request"
         loading={pending === 'OPEN'}
         onConfirm={() => void go('OPEN')}
@@ -259,89 +264,56 @@ function LifecyclePanel({
 
 // ---------- Properties ----------
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+function Row({
+  label,
+  children,
+  changed,
+}: {
+  label: string;
+  children: ReactNode;
+  changed?: boolean;
+}) {
   return (
     <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3 px-4 py-2.5">
-      <dt className="text-[13px] text-ink-3">{label}</dt>
+      <dt className="flex items-center gap-1.5 text-[13px] text-ink-3">
+        {label}
+        {changed && (
+          <span className="size-1.5 rounded-full bg-cobalt" title="Changed, not saved yet">
+            <span className="sr-only">(changed, not saved yet)</span>
+          </span>
+        )}
+      </dt>
       <dd className="min-w-0 text-[13px] text-ink">{children}</dd>
     </div>
   );
 }
 
-function PropertiesPanel({
-  request: r,
-  user,
-  mayWork,
-}: {
-  request: ServiceRequest;
-  user: User;
-  mayWork: boolean;
-}) {
-  const assignees = useAssignees();
-  const assign = useAssign(r.id);
-  const update = useUpdateRequest(r.id);
-  const [confirmUnassign, setConfirmUnassign] = useState(false);
-  const resolved = r.status === 'RESOLVED';
-  const isManager = user.role === 'MANAGER';
-
-  const onAssign = (value: string) => {
-    if (value === '') return setConfirmUnassign(true);
-    assign.mutate({ assignedToId: Number(value), version: r.version });
-  };
-
+function PropertiesPanel({ request: r, user }: { request: ServiceRequest; user: User }) {
+  const editable = canEditDetails(user) && r.status !== 'RESOLVED';
   return (
-    <Panel className="lg:sticky lg:top-6">
+    <Panel className="overflow-hidden lg:sticky lg:top-6">
       <PanelHeader title="Details" />
       <dl className="divide-y divide-line">
-        <Row label="Assignee">
-          {isManager && !resolved ? (
-            <Select
-              aria-label="Assignee"
-              value={r.assignedTo?.id ?? ''}
-              onChange={(e) => onAssign(e.target.value)}
-              disabled={assign.isPending}
-            >
-              <option value="">Unassigned</option>
-              {/* keep the current assignee selectable even if the list is loading */}
-              {r.assignedTo && !assignees.data?.some((u) => u.id === r.assignedTo!.id) && (
-                <option value={r.assignedTo.id}>{r.assignedTo.name}</option>
+        {editable ? (
+          // Remounts after every save, so the editor always starts from the saved values.
+          <TriageEditor key={r.version} request={r} />
+        ) : (
+          <>
+            <Row label="Assignee">
+              {r.assignedTo ? (
+                <span className="flex items-center gap-2">
+                  <Avatar name={r.assignedTo.name} size="xs" />
+                  {r.assignedTo.name}
+                </span>
+              ) : (
+                <span className="text-ink-3">Unassigned</span>
               )}
-              {assignees.data?.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                  {u.activeCount ? ` (${u.activeCount})` : ''}
-                </option>
-              ))}
-            </Select>
-          ) : r.assignedTo ? (
-            <span className="flex items-center gap-2">
-              <Avatar name={r.assignedTo.name} size="xs" />
-              {r.assignedTo.name}
-            </span>
-          ) : (
-            <span className="text-ink-3">Unassigned</span>
-          )}
-        </Row>
-        <Row label="Priority">
-          {mayWork && !resolved ? (
-            <Select
-              aria-label="Priority"
-              value={r.priority}
-              disabled={update.isPending}
-              onChange={(e) =>
-                update.mutate({ priority: e.target.value as Priority, version: r.version })
-              }
-            >
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {PRIORITY_LABEL[p]}
-                </option>
-              ))}
-            </Select>
-          ) : (
-            <PriorityBadge priority={r.priority} />
-          )}
-        </Row>
+            </Row>
+            <Row label="Priority">
+              <PriorityBadge priority={r.priority} />
+            </Row>
+          </>
+        )}
         <Row label="Source">
           <SourceLabel source={r.source} />
         </Row>
@@ -367,6 +339,114 @@ function PropertiesPanel({
           )}
         </Row>
       </dl>
+    </Panel>
+  );
+}
+
+/** Manager's assignee and priority. Changes wait for an explicit Save; nothing saves on its own. */
+function TriageEditor({ request: r }: { request: ServiceRequest }) {
+  const assignees = useAssignees();
+  const assign = useAssign(r.id);
+  const update = useUpdateRequest(r.id);
+  const savedAssignee = String(r.assignedTo?.id ?? '');
+  const [assignee, setAssignee] = useState(savedAssignee);
+  const [priority, setPriority] = useState<Priority>(r.priority);
+  const [confirmUnassign, setConfirmUnassign] = useState(false);
+  const assigneeChanged = assignee !== savedAssignee;
+  const priorityChanged = priority !== r.priority;
+  const dirty = assigneeChanged || priorityChanged;
+  const saving = assign.isPending || update.isPending;
+
+  // Warn before leaving the page with unsaved changes.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  const discard = () => {
+    setAssignee(savedAssignee);
+    setPriority(r.priority);
+  };
+
+  const save = async () => {
+    setConfirmUnassign(false);
+    try {
+      let version = r.version;
+      if (priorityChanged) version = (await update.mutateAsync({ priority, version })).version;
+      if (assigneeChanged) {
+        await assign.mutateAsync({ assignedToId: assignee ? Number(assignee) : null, version });
+        if (!priorityChanged) toast.success('Changes saved');
+      }
+    } catch {
+      /* the mutation shows the error and refreshes the request */
+    }
+  };
+
+  const onSave = () => (assigneeChanged && !assignee ? setConfirmUnassign(true) : void save());
+
+  return (
+    <>
+      <Row label="Assignee" changed={assigneeChanged}>
+        <Select
+          aria-label="Assignee"
+          value={assignee}
+          onChange={(e) => setAssignee(e.target.value)}
+          disabled={saving}
+        >
+          <option value="">Unassigned</option>
+          {/* keep the current assignee selectable even while the list loads */}
+          {r.assignedTo && !assignees.data?.some((u) => u.id === r.assignedTo!.id) && (
+            <option value={r.assignedTo.id}>{r.assignedTo.name}</option>
+          )}
+          {assignees.data?.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+              {u.activeCount ? ` (${u.activeCount})` : ''}
+            </option>
+          ))}
+        </Select>
+      </Row>
+      <Row label="Priority" changed={priorityChanged}>
+        <Select
+          aria-label="Priority"
+          value={priority}
+          onChange={(e) => setPriority(e.target.value as Priority)}
+          disabled={saving}
+        >
+          {PRIORITIES.map((p) => (
+            <option key={p} value={p}>
+              {PRIORITY_LABEL[p]}
+            </option>
+          ))}
+        </Select>
+      </Row>
+      <AnimatePresence initial={false}>
+        {dirty && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden bg-cobalt-soft/60"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+              <span className="text-[13px] font-medium text-ink" role="status">
+                Unsaved changes
+              </span>
+              <span className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={discard} disabled={saving}>
+                  Discard
+                </Button>
+                <Button size="sm" variant="primary" onClick={onSave} loading={saving}>
+                  Save changes
+                </Button>
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <ConfirmDialog
         open={confirmUnassign}
         title={`Unassign ${r.assignedTo?.name ?? ''}?`}
@@ -375,22 +455,17 @@ function PropertiesPanel({
             ? 'The request will go back to Open because work cannot be in progress without an owner.'
             : 'The request will go back to the unassigned queue.'
         }
-        confirmLabel="Unassign"
+        confirmLabel="Unassign and save"
         danger
-        loading={assign.isPending}
-        onConfirm={() =>
-          assign.mutate(
-            { assignedToId: null, version: r.version },
-            { onSettled: () => setConfirmUnassign(false) },
-          )
-        }
+        loading={saving}
+        onConfirm={() => void save()}
         onClose={() => setConfirmUnassign(false)}
       />
-    </Panel>
+    </>
   );
 }
 
-// ---------- Edit ----------
+// ---------- Edit details ----------
 
 type EditValues = {
   title: string;
@@ -398,7 +473,6 @@ type EditValues = {
   requesterName: string;
   requesterContact: string;
   source: ServiceRequest['source'];
-  priority: Priority;
   version: number;
 };
 
@@ -411,33 +485,71 @@ function EditDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const [dirty, setDirty] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const close = () => {
+    setDirty(false);
+    setConfirmDiscard(false);
+    onClose();
+  };
+  const requestClose = () => (dirty ? setConfirmDiscard(true) : close());
+
   return (
-    <Dialog open={open} onClose={onClose} title={`Edit ${r.referenceNumber}`} width="max-w-xl">
-      {/* Remount the form on every open so it starts from the latest saved values. */}
-      {open && <EditForm request={r} onDone={onClose} />}
-    </Dialog>
+    <>
+      <Dialog
+        open={open}
+        onClose={requestClose}
+        title={`Edit details of ${r.referenceNumber}`}
+        description="Nothing changes until you press Save changes."
+        width="max-w-xl"
+      >
+        {/* Remount the form on every open so it starts from the latest saved values. */}
+        {open && <EditForm request={r} onDone={close} onCancel={requestClose} onDirty={setDirty} />}
+      </Dialog>
+      <ConfirmDialog
+        open={confirmDiscard}
+        title="Discard your changes?"
+        body="You edited this request but did not save. If you leave now, your changes are lost."
+        confirmLabel="Discard changes"
+        danger
+        onConfirm={close}
+        onClose={() => setConfirmDiscard(false)}
+      />
+    </>
   );
 }
 
-function EditForm({ request: r, onDone }: { request: ServiceRequest; onDone: () => void }) {
+function EditForm({
+  request: r,
+  onDone,
+  onCancel,
+  onDirty,
+}: {
+  request: ServiceRequest;
+  onDone: () => void;
+  onCancel: () => void;
+  onDirty: (dirty: boolean) => void;
+}) {
   const update = useUpdateRequest(r.id);
   const {
     register,
+    control,
     handleSubmit,
     setError,
     formState: { errors, isDirty, dirtyFields },
   } = useForm<EditValues>({
     resolver: zodResolver(updateRequestSchema) as never,
+    mode: 'onTouched',
     defaultValues: {
       title: r.title,
       description: r.description,
       requesterName: r.requesterName,
       requesterContact: r.requesterContact,
       source: r.source,
-      priority: r.priority,
       version: r.version,
     },
   });
+  useEffect(() => onDirty(isDirty), [isDirty, onDirty]);
 
   const onSubmit = handleSubmit(async (values) => {
     // Send only what changed, so the activity log records exactly the edited fields.
@@ -470,27 +582,6 @@ function EditForm({ request: r, onDone }: { request: ServiceRequest; onDone: () 
             {...register('requesterName')}
           />
         </Field>
-        <Field
-          id="edit-requesterContact"
-          label="Contact information"
-          error={errors.requesterContact?.message}
-        >
-          <Input
-            id="edit-requesterContact"
-            aria-invalid={!!errors.requesterContact}
-            {...register('requesterContact')}
-          />
-        </Field>
-      </div>
-      <Field id="edit-description" label="Description" error={errors.description?.message}>
-        <Textarea
-          id="edit-description"
-          rows={5}
-          aria-invalid={!!errors.description}
-          {...register('description')}
-        />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
         <Field id="edit-source" label="Source">
           <Select id="edit-source" {...register('source')}>
             {SOURCES.map((s) => (
@@ -500,19 +591,33 @@ function EditForm({ request: r, onDone }: { request: ServiceRequest; onDone: () 
             ))}
           </Select>
         </Field>
-        <Field id="edit-priority" label="Priority">
-          <Select id="edit-priority" {...register('priority')}>
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {PRIORITY_LABEL[p]}
-              </option>
-            ))}
-          </Select>
-        </Field>
       </div>
+      <Controller
+        name="requesterContact"
+        control={control}
+        render={({ field, fieldState }) => (
+          <ContactField
+            id="edit-requesterContact"
+            value={field.value}
+            onChange={field.onChange}
+            onBlur={field.onBlur}
+            invalid={!!fieldState.error}
+            error={fieldState.error?.message}
+          />
+        )}
+      />
+      <Field id="edit-description" label="Description" error={errors.description?.message}>
+        <Textarea
+          id="edit-description"
+          rows={5}
+          aria-invalid={!!errors.description}
+          {...register('description')}
+        />
+      </Field>
       <input type="hidden" {...register('version', { valueAsNumber: true })} />
-      <div className="mt-2 flex justify-end gap-2">
-        <Button onClick={onDone}>Cancel</Button>
+      <div className="mt-2 flex items-center justify-end gap-2">
+        {isDirty && <span className="mr-auto text-[13px] text-ink-2">Unsaved changes</span>}
+        <Button onClick={onCancel}>Cancel</Button>
         <Button type="submit" variant="primary" loading={update.isPending} disabled={!isDirty}>
           Save changes
         </Button>

@@ -1,12 +1,18 @@
 import { z } from 'zod';
-import { PRIORITIES, ROLES, SOURCES, STATUSES } from './domain';
+import { contactError, PRIORITIES, ROLES, SOURCES, STATUSES } from './domain';
 
-const text = (label: string, max: number) =>
+// Empty gets "is required"; too short gets its own message (pipe stops at the first failure).
+const text = (label: string, max: number, min = 1) =>
   z
     .string({ error: `${label} is required` })
     .trim()
     .min(1, `${label} is required`)
-    .max(max, `${label} must be at most ${max} characters`);
+    .pipe(
+      z
+        .string()
+        .min(min, `${label} needs at least ${min} characters`)
+        .max(max, `${label} must be at most ${max} characters`),
+    );
 
 const id = z.coerce.number().int().positive();
 const version = z.number({ error: 'version is required' }).int().nonnegative();
@@ -23,10 +29,13 @@ export const loginSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 
 const requestFields = {
-  title: text('Title', 150),
-  description: text('Description', 5000),
-  requesterName: text('Requester name', 120),
-  requesterContact: text('Contact information', 200),
+  title: text('Title', 150, 3),
+  description: text('Description', 5000, 10),
+  requesterName: text('Requester name', 120, 2),
+  requesterContact: text('Contact information', 200).superRefine((value, ctx) => {
+    const problem = contactError(value);
+    if (problem) ctx.addIssue({ code: 'custom', message: problem });
+  }),
   source: z.enum(SOURCES, { error: 'Choose a valid source' }),
   priority: z.enum(PRIORITIES, { error: 'Choose a valid priority' }),
 };

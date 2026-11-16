@@ -35,15 +35,16 @@ Last full run: 16 November 2026, Windows 11, Node 25.8.2, Chromium (Playwright 1
 | Suite     | File                                         | Tests   | Result                   |
 | --------- | -------------------------------------------- | ------- | ------------------------ |
 | API       | `server/tests/auth.test.ts`                  | 17      | passed                   |
-| API       | `server/tests/requests.test.ts`              | 33      | passed                   |
-| API       | `server/tests/status.test.ts`                | 11      | passed                   |
+| API       | `server/tests/requests.test.ts`              | 46      | passed                   |
+| API       | `server/tests/status.test.ts`                | 16      | passed                   |
 | API       | `server/tests/notes-and-permissions.test.ts` | 18      | passed                   |
-| Frontend  | `client/src/test/app.test.tsx`               | 21      | passed                   |
+| Frontend  | `client/src/test/app.test.tsx`               | 23      | passed                   |
 | Frontend  | `client/src/test/safe-next.test.ts`          | 6       | passed                   |
 | Frontend  | `client/src/test/errors.test.tsx`            | 11      | passed                   |
-| E2E       | `tests/e2e/journey.spec.ts`                  | 3       | passed                   |
+| Frontend  | `client/src/test/forms.test.tsx`             | 8       | passed                   |
+| E2E       | `tests/e2e/journey.spec.ts`                  | 4       | passed                   |
 | E2E       | `tests/e2e/responsive.spec.ts`               | 6       | passed                   |
-| **Total** |                                              | **126** | **126 passed, 0 failed** |
+| **Total** |                                              | **155** | **155 passed, 0 failed** |
 
 `npm run typecheck` and `npm run lint` report no errors. `prettier --check` is clean.
 
@@ -86,6 +87,10 @@ data written through the API is read back through a fresh database connection (A
 ### Frontend
 
 sign-in validation, server error message, password visibility toggle, redirect to the requested page after sign-in, redirect to sign-in without a session; request list loading, first-run empty, filtered empty, error with retry, search and filter parameters sent to the server, personal empty state on My requests; create form validation, successful create with idempotency key and CSRF header, employee assignee options; request details, notes empty state and history; status change sends the version it read; Start work disabled without an assignee; work controls hidden from non-owners; empty note rejected and valid note added; not-found state; post-login redirect guard rejects off-site and `/\host` paths.
+
+### Duties and data entry
+
+The manager cannot start or resolve work (403 with a clear message) but can reopen resolved work; the assigned employee starts, resolves and reopens; employees cannot edit details or priority. Field rules are checked on the server and in the form: minimum lengths for title, requester and description, and the contact rules for phone, email and extension, including free text like "Teams message" being rejected. In the browser, the contact picker filters what can be typed, assignee and priority changes send nothing until Save changes, Discard puts the saved values back, and closing an edited dialog asks first.
 
 ### Error pages and loading
 

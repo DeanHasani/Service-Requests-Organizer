@@ -108,18 +108,21 @@ describe('authorization', () => {
 
   it('blocks employees from editing unassigned requests', async () => {
     const r = await createRequest(mia);
-    expect((await ann.patch(`/api/requests/${r.id}`, { title: 'x', version: 0 })).status).toBe(403);
+    expect(
+      (await ann.patch(`/api/requests/${r.id}`, { title: 'Longer title', version: 0 })).status,
+    ).toBe(403);
   });
 
-  it('lets employees fully work their own requests', async () => {
+  it('lets employees work their own requests but leaves the details to the manager', async () => {
     const r = await createRequest(mia, { assignedToId: users.ann.id });
+    const edit = await ann.patch(`/api/requests/${r.id}`, { priority: 'URGENT', version: 0 });
+    expect(edit.status).toBe(403);
+    expect(edit.body.error.message).toBe('Only managers can edit request details');
     expect(
-      (await ann.patch(`/api/requests/${r.id}`, { priority: 'URGENT', version: 0 })).status,
-    ).toBe(200);
-    expect(
-      (await ann.patch(`/api/requests/${r.id}/status`, { status: 'IN_PROGRESS', version: 1 }))
+      (await ann.patch(`/api/requests/${r.id}/status`, { status: 'IN_PROGRESS', version: 0 }))
         .status,
     ).toBe(200);
+    expect((await ann.post(`/api/requests/${r.id}/notes`, { content: 'On it' })).status).toBe(201);
   });
 
   it('ignores a role sent by the client', async () => {
@@ -138,12 +141,12 @@ describe('team and accounts', () => {
   it('lists the team with workload counts and no password hashes', async () => {
     const r = await createRequest(mia, { assignedToId: users.ann.id });
     await createRequest(mia, { assignedToId: users.ann.id });
-    await mia.patch(`/api/requests/${r.id}/status`, { status: 'RESOLVED', version: 0 });
+    await ann.patch(`/api/requests/${r.id}/status`, { status: 'RESOLVED', version: 0 });
     const res = await ann.get('/api/users');
     const annRow = res.body.data.find((u: { id: number }) => u.id === users.ann.id);
-    expect(annRow).toMatchObject({ activeCount: 1, resolvedCount: 0 });
+    expect(annRow).toMatchObject({ activeCount: 1, resolvedCount: 1 });
     const miaRow = res.body.data.find((u: { id: number }) => u.id === users.manager.id);
-    expect(miaRow.resolvedCount).toBe(1);
+    expect(miaRow).toMatchObject({ activeCount: 0, resolvedCount: 0 });
     expect(JSON.stringify(res.body)).not.toContain('passwordHash');
   });
 
@@ -197,8 +200,8 @@ describe('team and accounts', () => {
 
   it('dashboard counts come from the database', async () => {
     await createRequest(mia, { assignedToId: users.ann.id });
-    const r = await createRequest(mia);
-    await mia.patch(`/api/requests/${r.id}/status`, { status: 'RESOLVED', version: 0 });
+    const r = await createRequest(mia, { assignedToId: users.bob.id });
+    await bob.patch(`/api/requests/${r.id}/status`, { status: 'RESOLVED', version: 0 });
     const res = await ann.get('/api/dashboard');
     expect(res.body.data).toMatchObject({
       total: 2,

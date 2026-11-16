@@ -2,7 +2,7 @@
 
 ## Summary
 
-DESKFLOW is a full-stack service request tracker for a small internal IT support team. Staff register requests that came in by phone, email or message, give each one an owner, move it through Open, In progress and Resolved, and leave internal notes. Every change is recorded with who made it and when. All requirements in the brief are implemented. 126 automated tests pass, and lint, strict typecheck and formatting are clean.
+DESKFLOW is a full-stack service request tracker for a small internal IT support team. Staff register requests that came in by phone, email or message, give each one an owner, move it through Open, In progress and Resolved, and leave internal notes. Every change is recorded with who made it and when. All requirements in the brief are implemented. 155 automated tests pass, and lint, strict typecheck and formatting are clean.
 
 ## Completed features
 
@@ -12,7 +12,7 @@ DESKFLOW is a full-stack service request tracker for a small internal IT support
 | Roles                                                                                                                                   | Manager and Employee, enforced on the server for every endpoint; the UI hides what the user cannot do                                                                                                                                                       |
 | Dashboard                                                                                                                               | Totals by status, unassigned count, your workload, urgent and high counts, status split bar, recently updated requests, recent activity, quick create                                                                                                       |
 | All requests                                                                                                                            | Search (title, requester, contact, description, reference), filters (status, priority, source, assignee), sortable columns, server-side pagination, clear filters, row navigation, loading, error and empty states, filters kept in the URL                 |
-| Create request                                                                                                                          | Validated form, fast source and priority pickers, optional assignee, double-submit protection (disabled button plus server idempotency key), success toast, opens the new request                                                                           |
+| Create request                                                                                                                          | Fields checked when you leave them (minimum lengths, contact with a phone, email or extension picker that filters what can be typed), double-submit protection (disabled button plus server idempotency key), success toast, opens the new request          |
 | Request page                                                                                                                            | Every field, lifecycle rail with Start work, Resolve and Reopen, edit dialog, assign, reassign and unassign (with confirmation), inline priority, resolution details, internal notes, activity history                                                      |
 | My requests                                                                                                                             | Your assigned requests with search, status and priority filters, and an empty state                                                                                                                                                                         |
 | Unassigned                                                                                                                              | Open requests with no owner, most urgent first; managers assign in one step, employees claim                                                                                                                                                                |
@@ -33,16 +33,16 @@ A React single-page app talks to an Express REST API on the same origin. The API
 - The create form sends a key generated in the browser, so a double click, a retry or a second open tab still produces one request.
 - `SR-000001` style numbers come from a counter row that is incremented inside the create transaction, so two requests can never get the same number.
 - Every change is saved in the same transaction as its activity entries.
-- Where the brief left room, managers hand out work and are never assignees themselves. Employees can claim unassigned work, change priority on their own requests and reopen them. Unassigning a request that is in progress moves it back to Open. [docs/assumptions.md](docs/assumptions.md) lists each of these.
+- Where the brief left room, duties are split cleanly. The manager creates, edits, assigns and tracks; they can reopen resolved work but never start or resolve it and are never an assignee. The assigned employee starts, notes and resolves the work and can reopen it. Employees can claim unassigned work. Unassigning a request that is in progress moves it back to Open. [docs/assumptions.md](docs/assumptions.md) lists each of these.
 
 ## Testing results
 
 | Suite                                      | Tests   | Result         |
 | ------------------------------------------ | ------- | -------------- |
-| API (Supertest, isolated `test.db`)        | 79      | passed         |
-| Frontend (React Testing Library)           | 38      | passed         |
-| End-to-end (Playwright, isolated `e2e.db`) | 9       | passed         |
-| **Total**                                  | **126** | **all passed** |
+| API (Supertest, isolated `test.db`)        | 97      | passed         |
+| Frontend (React Testing Library)           | 48      | passed         |
+| End-to-end (Playwright, isolated `e2e.db`) | 10      | passed         |
+| **Total**                                  | **155** | **all passed** |
 
 The end-to-end run covers the full ten-step journey from the brief, a permission check across employees, persistence through a new server process, and a no-sideways-scroll check of every screen on phone, iPad and desktop sizes. A clean install from an empty folder (`npm ci`, setup, tests) was also verified. Coverage details and known gaps: [docs/testing.md](docs/testing.md).
 

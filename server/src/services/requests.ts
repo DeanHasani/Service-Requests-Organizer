@@ -2,7 +2,8 @@ import { Prisma, type ActionType, type Priority } from '@prisma/client';
 import {
   canAssign,
   canTransition,
-  canWorkOn,
+  canChangeStatus,
+  canEditDetails,
   formatReference,
   PRIORITY_LABEL,
   SOURCE_LABEL,
@@ -214,7 +215,7 @@ const display = (field: (typeof EDITABLE)[number], value: string) =>
 export async function updateRequest(id: number, input: UpdateRequestInput, user: AuthUser) {
   await prisma.$transaction(async (tx) => {
     const current = await load(id, tx);
-    if (!canWorkOn(user, current)) throw forbidden('You can only edit requests assigned to you');
+    if (!canEditDetails(user)) throw forbidden('Only managers can edit request details');
     if (current.status === 'RESOLVED')
       throw rule('REQUEST_RESOLVED', 'Reopen the request before editing it');
 
@@ -253,8 +254,13 @@ export async function changeStatus(
 ) {
   await prisma.$transaction(async (tx) => {
     const current = await load(id, tx);
-    if (!canWorkOn(user, current))
-      throw forbidden('You can only change the status of requests assigned to you');
+    if (!canChangeStatus(user, current, status)) {
+      throw forbidden(
+        user.role === 'MANAGER'
+          ? 'The assigned employee starts and resolves work. Managers can only reopen resolved requests.'
+          : 'You can only change the status of requests assigned to you',
+      );
+    }
     if (!canTransition(current.status, status)) {
       throw rule(
         'INVALID_TRANSITION',

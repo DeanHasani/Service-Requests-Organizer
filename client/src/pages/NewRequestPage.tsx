@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { useForm, type Path } from 'react-hook-form';
+import { Controller, useForm, type Path } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Mail, MessageSquare, MoreHorizontal, Phone } from 'lucide-react';
 import {
@@ -15,6 +15,7 @@ import { useAssignees, useCreateRequest } from '../lib/queries';
 import { ApiError } from '../lib/api';
 import { Button, Field, Input, PageHeader, Panel, Select, Textarea } from '../components/ui';
 import { Segmented } from '../components/Segmented';
+import { ContactField } from '../components/ContactField';
 
 type FormValues = CreateRequestInput;
 
@@ -48,10 +49,18 @@ export function NewRequestPage() {
     handleSubmit,
     setError,
     setFocus,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FormValues, unknown, z.output<typeof createRequestSchema>>({
     resolver: zodResolver(createRequestSchema),
-    defaultValues: { source: 'PHONE', priority: 'NORMAL', assignedToId: null, clientRequestId },
+    mode: 'onTouched', // check each field when the user leaves it, then live while they fix it
+    defaultValues: {
+      source: 'PHONE',
+      priority: 'NORMAL',
+      assignedToId: null,
+      requesterContact: '',
+      clientRequestId,
+    },
   });
 
   const onSubmit = handleSubmit(async (values) => {
@@ -90,7 +99,7 @@ export function NewRequestPage() {
             <Input id="title" autoFocus aria-invalid={!!errors.title} {...register('title')} />
           </Field>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <Field id="requesterName" label="Requester name" error={errors.requesterName?.message}>
               <Input
                 id="requesterName"
@@ -99,19 +108,20 @@ export function NewRequestPage() {
                 {...register('requesterName')}
               />
             </Field>
-            <Field
-              id="requesterContact"
-              label="Contact information"
-              error={errors.requesterContact?.message}
-              hint="Email, phone or extension."
-            >
-              <Input
-                id="requesterContact"
-                autoComplete="off"
-                aria-invalid={!!errors.requesterContact}
-                {...register('requesterContact')}
-              />
-            </Field>
+            <Controller
+              name="requesterContact"
+              control={control}
+              render={({ field, fieldState }) => (
+                <ContactField
+                  id="requesterContact"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  invalid={!!fieldState.error}
+                  error={fieldState.error?.message}
+                />
+              )}
+            />
           </div>
 
           <Field id="description" label="Description" error={errors.description?.message}>

@@ -22,9 +22,9 @@
 
 **Activity**: an automatic, append-only record of something that changed on a request.
 
-**Manager**: a user who can see and change any request, hand requests out to employees and manage accounts. A manager is never an assignee.
+**Manager**: a user who creates and edits requests, hands them out to employees, tracks their progress and manages accounts. A manager can reopen resolved work but never starts or resolves it and is never an assignee.
 
-**Employee**: a user who can see all requests but change only the ones assigned to them.
+**Employee**: a user who sees all requests and does the work on the ones assigned to them: starts it, adds notes, resolves it.
 
 **Active workload**: the number of requests assigned to a user that are not Resolved.
 

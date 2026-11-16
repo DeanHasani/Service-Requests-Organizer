@@ -9,11 +9,11 @@ Requests used to live in personal notes and spreadsheets. Some were forgotten, s
 ## Features
 
 - Sign-in with server-side sessions (no public sign-up; demo accounts are seeded)
-- Two roles. Managers see and change everything and hand work out. Employees work on the requests assigned to them and can claim unassigned ones.
+- Two roles with separate duties. Managers create and edit requests, assign them and track progress (they can reopen resolved work). Employees start, note and resolve the requests assigned to them and can claim unassigned ones.
 - Dashboard with live counts, status split, your workload, recent requests and recent activity
 - Request list with search, filters, sortable columns and server-side pagination
-- Create requests with validation and duplicate-submission protection
-- Request page: edit, assign, reassign, unassign, change priority, start, resolve, reopen
+- Create requests with field checks (minimum lengths, a contact field with a phone, email or extension picker) and duplicate-submission protection
+- Request page: edit details, assign and change priority with an explicit Save, start, resolve, reopen
 - Internal notes and an automatic, attributed activity history
 - My requests, Unassigned queue (with one-click assign or claim) and Team workload page
 - Managers can add team members and deactivate or reactivate accounts
@@ -92,9 +92,9 @@ The seed adds 18 requests covering every status, priority and source, assigned a
 ## Demo walkthrough
 
 1. Sign in as Growin Manager (`growin@deskflow.test`). Click **New request**, fill it in, create it.
-2. On the request page, pick Dean Hasani in the Assignee field.
+2. On the request page, pick Dean Hasani in the Assignee field and press **Save changes**.
 3. Sign out (bottom of the sidebar). Sign in as Dean (`dean@deskflow.test`).
-4. Open **My requests**, find the request, add a note, click **Start work**, then **Resolve**.
+4. Open **My requests**, find the request, add a note, click **Start work**, then **Resolve**. (Only the assigned employee has these buttons.)
 5. Sign in as the manager again and open the request. It shows who resolved it and when, the note, and the full activity history.
 6. Stop the servers and run `npm run dev` again. Everything is still there.
 

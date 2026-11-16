@@ -30,22 +30,27 @@ test('manager creates and assigns, employee works and resolves, manager verifies
   await page.getByRole('link', { name: 'New request' }).first().click();
   await page.getByLabel('Title').fill(TITLE);
   await page.getByLabel('Requester name').fill('Marta Ruiz');
-  await page.getByLabel('Contact information').fill('ext. 233');
+  await page.getByLabel('Contact type').selectOption('extension');
+  await page.getByLabel('Contact information').fill('233');
   await page
     .getByLabel('Description')
     .fill('Dell dock on desk 9 charges the laptop but neither monitor wakes up.');
-  await page.getByText('Phone', { exact: true }).click();
+  await page.getByRole('radio', { name: 'Phone' }).check({ force: true });
   await page.getByText('High', { exact: true }).click();
   await page.getByRole('button', { name: 'Create request' }).click();
 
   await expect(page.getByRole('heading', { name: TITLE })).toBeVisible();
   requestUrl = new URL(page.url()).pathname;
-  await expect(page.getByText('Assign someone before starting work.')).toBeVisible();
+  await expect(
+    page.getByText('Nobody owns this yet. Choose an assignee in Details.'),
+  ).toBeVisible();
 
   // 3. Manager assigns an employee.
   const assignee = page.getByLabel('Assignee');
   const dean = await assignee.locator('option', { hasText: 'Dean Hasani' }).getAttribute('value');
   await assignee.selectOption(dean!);
+  await expect(page.getByText('Unsaved changes')).toBeVisible();
+  await page.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByText('assigned the request to Dean Hasani')).toBeVisible();
   await signOut(page);
 
@@ -138,4 +143,12 @@ test('data survives a server restart', async () => {
     proc.kill();
     await new Promise((resolve) => proc.once('exit', resolve));
   }
+});
+
+test('the manager tracks work but cannot start or resolve it', async ({ page }) => {
+  await signIn(page, 'growin@deskflow.test');
+  await page.goto(requestUrl);
+  await expect(page.getByRole('button', { name: 'Reopen' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start work' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Resolve' })).toHaveCount(0);
 });

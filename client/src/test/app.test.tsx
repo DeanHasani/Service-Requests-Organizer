@@ -3,6 +3,10 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { employee, makeRequest, manager, mockApi, page, renderApp, signedInAs } from './utils';
 
+/** Matches a paragraph whose full text is `text`, even when part of it is wrapped in a span. */
+const byText = (text: string) => (_: string, el: Element | null) =>
+  el?.tagName === 'P' && el.textContent === text;
+
 describe('login', () => {
   it('validates required fields before calling the server', async () => {
     const { calls } = mockApi({
@@ -175,6 +179,7 @@ describe('create request', () => {
     renderApp('/requests/new');
     await userEvent.type(await screen.findByLabelText('Title'), 'VPN drops');
     await userEvent.type(screen.getByLabelText('Requester name'), 'Jonas Frei');
+    await userEvent.selectOptions(screen.getByLabelText('Contact type'), 'email');
     await userEvent.type(screen.getByLabelText('Contact information'), 'jonas@example.com');
     await userEvent.type(screen.getByLabelText('Description'), 'Drops every 30 minutes.');
     await userEvent.click(screen.getByLabelText('Email'));
@@ -188,6 +193,7 @@ describe('create request', () => {
       source: 'EMAIL',
       priority: 'URGENT',
       assignedToId: null,
+      requesterContact: 'jonas@example.com',
     });
     expect((post.body as { clientRequestId: string }).clientRequestId).toMatch(/^[0-9a-f-]{36}$/);
     expect(post.headers['X-CSRF-Token']).toBe('csrf-test');
@@ -261,10 +267,10 @@ describe('request details', () => {
     expect(await screen.findByText('created SR-000007', { exact: false })).toBeInTheDocument();
   });
 
-  it('changes status with the version it read', async () => {
+  it('lets the assigned employee start work, sending the version it read', async () => {
     const r = makeRequest();
     const { calls } = mockApi({
-      ...signedInAs(manager),
+      ...signedInAs(employee),
       'GET /requests/7': { body: { data: r } },
       'PATCH /requests/7/status': ({ body }) => ({
         body: { data: { ...r, status: (body as { status: string }).status, version: 4 } },
@@ -277,14 +283,38 @@ describe('request details', () => {
     expect(patch.body).toEqual({ status: 'IN_PROGRESS', version: 3 });
   });
 
-  it('disables Start work when nobody is assigned', async () => {
+  it('lets the manager track work without starting or resolving it', async () => {
+    mockApi({ ...signedInAs(manager), 'GET /requests/7': { body: { data: makeRequest() } } });
+    renderApp('/requests/7');
+    expect(
+      await screen.findByText(byText('Waiting for Dean Hasani to start.')),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Start work/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Resolve/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Edit details/ })).toBeInTheDocument();
+  });
+
+  it('lets the manager reopen a resolved request', async () => {
+    const resolved = makeRequest({
+      status: 'RESOLVED',
+      resolvedBy: { id: 2, name: 'Dean Hasani' },
+      resolvedAt: '2026-11-15T12:00:00.000Z',
+    });
+    mockApi({ ...signedInAs(manager), 'GET /requests/7': { body: { data: resolved } } });
+    renderApp('/requests/7');
+    expect(await screen.findByRole('button', { name: /Reopen/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Edit details/ })).not.toBeInTheDocument();
+  });
+
+  it('tells a manager to pick an assignee when nobody owns the request', async () => {
     mockApi({
       ...signedInAs(manager),
       'GET /requests/7': { body: { data: makeRequest({ assignedTo: null }) } },
     });
     renderApp('/requests/7');
-    expect(await screen.findByRole('button', { name: /Start work/ })).toBeDisabled();
-    expect(screen.getByText('Assign someone before starting work.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Nobody owns this yet. Choose an assignee in Details.'),
+    ).toBeInTheDocument();
   });
 
   it("hides work controls from an employee who doesn't own the request", async () => {
@@ -295,10 +325,10 @@ describe('request details', () => {
       },
     });
     renderApp('/requests/7');
-    expect(
-      await screen.findByText('Only Roman Max or a manager can update this request.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(byText('Waiting for Roman Max to start.'))).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Start work/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Resolve/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Edit details/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add note' })).not.toBeInTheDocument();
   });
 
