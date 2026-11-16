@@ -11,14 +11,6 @@ import { errorMessage } from '../lib/api';
 import { Button, Field, Input } from '../components/ui';
 import { LifecycleRail } from '../components/request-bits';
 
-export const DEMO_PASSWORD = 'Deskflow!2026';
-const DEMO_ACCOUNTS = [
-  { email: 'growing@deskflow.test', name: 'Growin Manager', role: 'Manager' },
-  { email: 'dean@deskflow.test', name: 'Dean Hasani', role: 'Employee' },
-  { email: 'roman@deskflow.test', name: 'Roman Max', role: 'Employee' },
-  { email: 'roxanne@deskflow.test', name: 'Roxanne Keys', role: 'Employee' },
-];
-
 /** Only allow same-app paths as the post-login destination (browsers read `/\host` as `//host`). */
 export const safeNext = (next: string | null) =>
   next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : '/';
@@ -32,7 +24,6 @@ export function LoginPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<z.input<typeof loginSchema>, unknown, LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -49,12 +40,6 @@ export function LoginPage() {
       setFormError(errorMessage(err));
     }
   });
-
-  const fill = (email: string) => {
-    setValue('email', email, { shouldValidate: true });
-    setValue('password', DEMO_PASSWORD, { shouldValidate: true });
-    setFormError(null);
-  };
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
@@ -152,36 +137,6 @@ export function LoginPage() {
               {isSubmitting ? 'Signing in…' : 'Sign in'}
             </Button>
           </form>
-
-          <section aria-labelledby="demo-heading" className="mt-10 border-t border-line pt-6">
-            <h2 id="demo-heading" className="text-[13px] font-semibold">
-              Demo accounts
-            </h2>
-            <p className="mt-1 text-[13px] text-ink-2">
-              Password for all:{' '}
-              <code className="rounded bg-sunken px-1.5 py-0.5 text-[12px] text-ink">
-                {DEMO_PASSWORD}
-              </code>
-              . Pick one to fill the form.
-            </p>
-            <ul className="mt-3 divide-y divide-line overflow-hidden rounded-panel border border-line bg-surface">
-              {DEMO_ACCOUNTS.map((a) => (
-                <li key={a.email}>
-                  <button
-                    type="button"
-                    onClick={() => fill(a.email)}
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-sunken"
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-[13px] font-medium">{a.name}</span>
-                      <span className="block truncate text-xs text-ink-3">{a.email}</span>
-                    </span>
-                    <span className="text-xs text-ink-2">{a.role}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
         </div>
       </main>
     </div>

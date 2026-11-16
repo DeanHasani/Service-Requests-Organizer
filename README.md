@@ -76,7 +76,7 @@ Open http://localhost:5173 and sign in with a demo account.
 
 ## Demo accounts
 
-All use the password **`Deskflow!2026`** (the `SEED_PASSWORD` value). The sign-in page lists them and fills the form for you.
+All use the password **`Deskflow!2026`** (the `SEED_PASSWORD` value).
 
 | Name           | Email                 | Role     |
 | -------------- | --------------------- | -------- |

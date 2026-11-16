@@ -46,7 +46,7 @@ Status legend: `[x]` done, `[ ]` open.
 ### Phase 4: Frontend
 
 - [x] Design tokens, app shell, navy sidebar with sliding active indicator
-- [x] Login (validation, password toggle, demo accounts)
+- [x] Login (validation, password toggle)
 - [x] Dashboard
 - [x] All requests table (mobile card list below md)
 - [x] Create request

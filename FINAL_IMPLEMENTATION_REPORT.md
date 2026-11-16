@@ -56,7 +56,7 @@ The end-to-end run covers the full ten-step journey from the brief, a permission
 - The sign-in rate limit is per IP and trusts only a loopback proxy. Behind another proxy or load balancer, set Express `trust proxy` to match, or every user shares one limit.
 - `npm audit` reports advisories in `deepmerge-ts`, pulled in by the Prisma CLI tooling. It is not used at request time and goes away with a future Prisma upgrade.
 - The client bundle is about 670 kB before compression (one chunk). Route-level code splitting would reduce first load.
-- The sign-in page shows the demo password because the brief asks for demo credentials. A real deployment should remove that panel and change the seeded passwords.
+- Demo credentials are documented in the README only, not shown in the app. A real deployment should change the seeded passwords.
 - Two places build the navy "New request" link by hand instead of using the shared button component; it looks the same but is duplicated styling.
 - Every signed-in user can read every request and the team list. This is intentional for a shared queue, but a stricter deployment might want it narrowed.
 

@@ -48,7 +48,8 @@ describe('login', () => {
       'GET /users': { body: { data: [] } },
     });
     renderApp('/login?next=%2Fteam');
-    await userEvent.click(await screen.findByRole('button', { name: /Growin Manager/ }));
+    await userEvent.type(await screen.findByLabelText('Email'), 'growing@deskflow.test');
+    await userEvent.type(screen.getByLabelText('Password'), 'Deskflow!2026');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('heading', { name: 'Team' })).toBeInTheDocument();
   });
