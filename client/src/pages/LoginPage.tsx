@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,6 +19,31 @@ const TONE = { open: '#5b7ff0', progress: '#e8a23e', done: '#3fa56f' };
 const EASE = [0.23, 1, 0.32, 1] as const;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Distance from the card's bottom edge to the centre of the Done stop (padding 40 + half of 64). */
+const DONE_CENTER = 72;
+
+type RailState = { started: boolean; progress: number; done: boolean };
+
+/** What the rail shows while nobody is typing: a request going from Open to Done, on a loop. */
+const DEMO: (RailState & { ms: number })[] = [
+  { started: false, progress: 0, done: false, ms: 1500 },
+  { started: true, progress: 0.3, done: false, ms: 1000 },
+  { started: true, progress: 0.6, done: false, ms: 1000 },
+  { started: true, progress: 0.88, done: false, ms: 1000 },
+  { started: true, progress: 1, done: true, ms: 2200 },
+];
+
+function useDemoLoop(active: boolean): RailState {
+  const reduce = useReducedMotion();
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    if (!active || reduce) return;
+    const t = setTimeout(() => setStep((s) => (s + 1) % DEMO.length), DEMO[step]!.ms);
+    return () => clearTimeout(t);
+  }, [active, reduce, step]);
+  return reduce ? DEMO[2]! : DEMO[step]!;
+}
+
 export function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
@@ -38,14 +63,21 @@ export function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
-  // How far the sign-in has got: typing fills the outline, a successful sign-in completes it.
+  // Typing drives the rail; an empty form lets it play on its own.
   const email = (watch('email') ?? '').trim();
   const password = watch('password') ?? '';
   const typed =
     (EMAIL_RE.test(email) ? 0.45 : Math.min(email.length / 20, 1) * 0.25) +
     Math.min(password.length / 8, 1) * 0.4;
-  const progress = done ? 1 : isSubmitting ? Math.max(typed, 0.9) : typed;
-  const started = done || typed > 0;
+  const interactive = typed > 0 || finishing || done;
+  const demo = useDemoLoop(!interactive);
+  const rail: RailState = interactive
+    ? {
+        started: true,
+        progress: done ? 1 : isSubmitting ? Math.max(typed, 0.9) : typed,
+        done,
+      }
+    : demo;
 
   if (user && !finishing) return <Navigate to={safeNext(params.get('next'))} replace />;
 
@@ -63,84 +95,71 @@ export function LoginPage() {
   });
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-navy bg-[radial-gradient(55%_45%_at_28%_42%,rgb(36_52_77/0.7),transparent_70%)] px-4 py-16 sm:px-8">
-      <div className="flex w-full max-w-5xl items-start justify-center">
-        {/* Left: brand and the first two stops. Its line runs into the sign-in card. */}
-        <div className="relative hidden flex-1 lg:block" aria-hidden>
-          <div className="absolute bottom-full left-0 mb-16 flex items-center gap-5">
-            <Logo className="size-16 xl:size-20" />
-            <span className="text-4xl font-bold tracking-[0.08em] text-white xl:text-5xl">
-              DESKFLOW
+    <div
+      className="relative isolate flex min-h-dvh flex-col items-center justify-center gap-12 overflow-hidden bg-[#09111f] px-4 py-14 sm:px-8 lg:gap-16"
+      style={{
+        // Faint light in the three status colours, coming in from the screen edges.
+        backgroundImage: [
+          'radial-gradient(38% 42% at 0% 8%, rgb(91 127 240 / 0.14), transparent 70%)',
+          'radial-gradient(34% 40% at 100% 48%, rgb(232 162 62 / 0.09), transparent 70%)',
+          'radial-gradient(40% 36% at 12% 100%, rgb(63 165 111 / 0.1), transparent 70%)',
+          'radial-gradient(55% 45% at 50% 22%, rgb(30 46 72 / 0.55), transparent 72%)',
+        ].join(','),
+      }}
+    >
+      <header className="flex max-w-3xl flex-col items-center text-center">
+        <div className="flex items-center gap-4">
+          <Logo className="size-12 sm:size-16" />
+          <span className="text-3xl font-bold tracking-[0.08em] text-white sm:text-5xl">
+            DESKFLOW
+          </span>
+        </div>
+        <h2 className="mt-8 text-2xl leading-tight font-semibold tracking-[-0.02em] text-balance text-white sm:text-4xl">
+          Every request has an owner, a status and a history.
+        </h2>
+        <p className="mt-3 text-base text-navy-ink sm:text-lg">
+          Log every call, email and message in one queue.
+        </p>
+      </header>
+
+      <div className="flex w-full max-w-5xl items-end justify-center">
+        {/* The first two stops. The line carries on into the card, to the Done stop at its foot. */}
+        <div
+          className="hidden flex-1 items-center lg:flex"
+          style={{ marginBottom: DONE_CENTER - 32 }}
+          aria-hidden
+        >
+          <Stop label="Open" reached tone={TONE.open}>
+            <span className="size-4 rounded-full bg-white" />
+          </Stop>
+          <Line filled={rail.started ? 1 : 0} from={TONE.open} to={TONE.progress} />
+          <Stop label="In progress" reached={rail.started} tone={TONE.progress}>
+            <span className="relative grid place-items-center">
+              <RefreshCw
+                className={cx(
+                  'size-8',
+                  rail.started && !rail.done && !reduce && 'animate-[spin_2.4s_linear_infinite]',
+                )}
+                strokeWidth={2.25}
+              />
+              <span className="absolute size-2.5 rounded-full bg-current" />
             </span>
-          </div>
-          <div className="mt-10 flex items-center">
-            <Stop label="Open" reached tone={TONE.open}>
-              <span className="size-3.5 rounded-full bg-white" />
-            </Stop>
-            <Line filled={started ? 1 : 0} from={TONE.open} to={TONE.progress} />
-            <Stop label="In progress" reached={started} tone={TONE.progress}>
-              <span className="relative grid place-items-center">
-                <RefreshCw
-                  className={cx(
-                    'size-7',
-                    started && !done && !reduce && 'animate-[spin_2.4s_linear_infinite]',
-                  )}
-                  strokeWidth={2.25}
-                />
-                <span className="absolute size-2 rounded-full bg-current" />
-              </span>
-            </Stop>
-            <Line filled={Math.min(progress / 0.9, 1)} from={TONE.progress} to={TONE.done} />
-          </div>
+          </Stop>
+          <Line filled={Math.min(rail.progress / 0.88, 1)} from={TONE.progress} to={TONE.done} />
         </div>
 
-        {/* Right: the sign-in card. Its outline is the last stretch of the rail. */}
-        <main className="w-full max-w-[380px] shrink-0">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <Logo className="size-10" />
-            <span className="text-xl font-bold tracking-[0.08em] text-white">DESKFLOW</span>
-          </div>
-          <ProgressCard progress={progress}>
-            {/* line entering the card from the left, up to the Done stop */}
-            <span
-              aria-hidden
-              className="absolute top-[67px] left-0 hidden h-[3px] w-10 overflow-hidden lg:block"
-            >
-              <motion.span
-                className="block h-full origin-left"
-                style={{ backgroundColor: TONE.done }}
-                initial={false}
-                animate={{ transform: `scaleX(${done ? 1 : 0})` }}
-                transition={{ duration: 0.35, ease: EASE }}
-              />
-            </span>
-
-            <div className="flex items-center gap-3" aria-live="polite">
-              <motion.span
-                initial={false}
-                animate={{
-                  backgroundColor: done ? TONE.done : '#ffffff',
-                  borderColor: done ? TONE.done : '#d6d1c9',
-                  color: done ? '#ffffff' : '#c3bdb3',
-                  boxShadow: done ? `0 0 26px -4px ${TONE.done}` : '0 0 0 0 rgba(0,0,0,0)',
-                  transform: done ? 'scale(1)' : 'scale(0.9)',
-                }}
-                transition={{ duration: 0.4, ease: EASE, delay: done ? 0.25 : 0 }}
-                className="grid size-14 shrink-0 place-items-center rounded-full border-2"
-              >
-                <Check className="size-6" strokeWidth={3} aria-hidden />
-              </motion.span>
-              <span
-                className={cx(
-                  'text-sm font-medium transition-colors duration-300',
-                  done ? 'text-resolved' : 'text-ink-3',
-                )}
-              >
-                {done ? 'Done. Opening DESKFLOW…' : 'Done'}
-              </span>
-            </div>
-
-            <h1 className="mt-8 text-2xl font-semibold tracking-[-0.02em]">Sign in</h1>
+        <main className="relative w-full max-w-[380px] shrink-0">
+          {/* Soft glow peeking out from behind the card. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -inset-14 -z-10 rounded-[48px] opacity-90 blur-3xl"
+            style={{
+              backgroundImage:
+                'radial-gradient(50% 45% at 20% 25%, rgb(91 127 240 / 0.28), transparent 70%), radial-gradient(45% 45% at 85% 50%, rgb(232 162 62 / 0.2), transparent 70%), radial-gradient(50% 45% at 40% 92%, rgb(63 165 111 / 0.26), transparent 70%)',
+            }}
+          />
+          <ProgressCard progress={rail.progress}>
+            <h1 className="text-2xl font-semibold tracking-[-0.02em]">Sign in</h1>
             <p className="mt-1.5 text-sm text-ink-2">Use your work email and password.</p>
 
             <form onSubmit={onSubmit} noValidate className="mt-7 flex flex-col gap-4">
@@ -200,6 +219,45 @@ export function LoginPage() {
                 {isSubmitting ? 'Signing in…' : 'Sign in'}
               </Button>
             </form>
+
+            {/* Done stop at the foot of the card, where the rail line comes in. */}
+            <span
+              aria-hidden
+              className="absolute left-0 hidden h-1 w-10 overflow-hidden lg:block"
+              style={{ bottom: DONE_CENTER - 2 }}
+            >
+              <motion.span
+                className="block h-full origin-left"
+                style={{ backgroundColor: TONE.done }}
+                initial={false}
+                animate={{ transform: `scaleX(${rail.done ? 1 : 0})` }}
+                transition={{ duration: 0.35, ease: EASE }}
+              />
+            </span>
+            <div className="mt-8 flex items-center gap-3" aria-live="polite">
+              <motion.span
+                initial={false}
+                animate={{
+                  backgroundColor: rail.done ? TONE.done : '#ffffff',
+                  borderColor: rail.done ? TONE.done : '#d6d1c9',
+                  color: rail.done ? '#ffffff' : '#c3bdb3',
+                  boxShadow: rail.done ? `0 0 28px -4px ${TONE.done}` : '0 0 0 0 rgba(0,0,0,0)',
+                  transform: rail.done ? 'scale(1)' : 'scale(0.9)',
+                }}
+                transition={{ duration: 0.4, ease: EASE, delay: rail.done ? 0.25 : 0 }}
+                className="grid size-16 shrink-0 place-items-center rounded-full border-2"
+              >
+                <Check className="size-7" strokeWidth={3} aria-hidden />
+              </motion.span>
+              <span
+                className={cx(
+                  'text-sm font-medium transition-colors duration-300',
+                  rail.done ? 'text-resolved' : 'text-ink-3',
+                )}
+              >
+                {done ? 'Done. Opening DESKFLOW…' : 'Done'}
+              </span>
+            </div>
           </ProgressCard>
         </main>
       </div>
@@ -233,7 +291,7 @@ function Stop({
   label: string;
   reached: boolean;
   tone: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <span className="relative shrink-0">
@@ -243,16 +301,16 @@ function Stop({
           backgroundColor: reached ? tone : '#111c30',
           borderColor: reached ? tone : '#3a4963',
           color: reached ? '#ffffff' : '#5d6c88',
-          boxShadow: reached ? `0 0 30px -4px ${tone}` : '0 0 0 0 rgba(0,0,0,0)',
+          boxShadow: reached ? `0 0 34px -4px ${tone}` : '0 0 0 0 rgba(0,0,0,0)',
         }}
-        transition={{ duration: 0.45, ease: EASE }}
-        className="grid size-14 place-items-center rounded-full border-2"
+        transition={{ duration: 0.5, ease: EASE }}
+        className="grid size-16 place-items-center rounded-full border-2"
       >
         {children}
       </motion.span>
       <span
         className={cx(
-          'absolute top-full left-1/2 mt-3 -translate-x-1/2 text-sm whitespace-nowrap transition-colors duration-300',
+          'absolute top-full left-1/2 mt-3.5 -translate-x-1/2 text-[15px] whitespace-nowrap transition-colors duration-300',
           reached ? 'font-semibold text-white' : 'text-navy-ink-dim',
         )}
       >
@@ -265,20 +323,45 @@ function Stop({
 /** Track between stops; `filled` from 0 to 1. */
 function Line({ filled, from, to }: { filled: number; from: string; to: string }) {
   return (
-    <span className="relative h-[3px] min-w-12 flex-1 overflow-hidden bg-white/10">
+    <span className="relative h-1 min-w-12 flex-1 overflow-hidden bg-white/10">
       <motion.span
         className="absolute inset-0 origin-left"
         style={{ backgroundImage: `linear-gradient(90deg, ${from}, ${to})` }}
         initial={false}
         animate={{ transform: `scaleX(${filled})` }}
-        transition={{ duration: 0.6, ease: [0.77, 0, 0.175, 1] }}
+        transition={{ duration: 0.8, ease: [0.77, 0, 0.175, 1] }}
       />
     </span>
   );
 }
 
+/**
+ * Rounded-rectangle outline that starts on the left edge at the Done stop, runs up and around
+ * the card clockwise, and ends back at Done.
+ */
+function outlinePath(w: number, h: number, r: number, startFromBottom: number) {
+  const i = 0.75; // half the stroke, so the line sits on the edge
+  const L = i;
+  const T = i;
+  const R = w - i;
+  const B = h - i;
+  const sy = B - startFromBottom;
+  return [
+    `M ${L} ${sy}`,
+    `V ${T + r}`,
+    `A ${r} ${r} 0 0 1 ${L + r} ${T}`,
+    `H ${R - r}`,
+    `A ${r} ${r} 0 0 1 ${R} ${T + r}`,
+    `V ${B - r}`,
+    `A ${r} ${r} 0 0 1 ${R - r} ${B}`,
+    `H ${L + r}`,
+    `A ${r} ${r} 0 0 1 ${L} ${B - r}`,
+    `V ${sy}`,
+  ].join(' ');
+}
+
 /** White card whose thin outline draws in green as `progress` goes from 0 to 1. */
-function ProgressCard({ progress, children }: { progress: number; children: React.ReactNode }) {
+function ProgressCard({ progress, children }: { progress: number; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -296,40 +379,29 @@ function ProgressCard({ progress, children }: { progress: number; children: Reac
     return () => ro.disconnect();
   }, []);
 
+  const d = size.w > 0 ? outlinePath(size.w, size.h, 23.25, DONE_CENTER) : '';
+
   return (
     <div
       ref={ref}
       className="relative rounded-[24px] bg-white p-8 shadow-[0_40px_90px_-30px_rgb(0_0_0/0.6)] sm:p-10"
     >
-      {size.w > 0 && (
+      {d && (
         <svg
           aria-hidden
           className="pointer-events-none absolute inset-0 size-full overflow-visible"
           viewBox={`0 0 ${size.w} ${size.h}`}
         >
-          <rect
-            x="0.75"
-            y="0.75"
-            width={size.w - 1.5}
-            height={size.h - 1.5}
-            rx="23.25"
-            fill="none"
-            stroke="#e7e4df"
-            strokeWidth="1.5"
-          />
-          <motion.rect
-            x="0.75"
-            y="0.75"
-            width={size.w - 1.5}
-            height={size.h - 1.5}
-            rx="23.25"
+          <path d={d} fill="none" stroke="#e7e4df" strokeWidth="1.5" />
+          <motion.path
+            d={d}
             fill="none"
             stroke={TONE.done}
-            strokeWidth="2"
+            strokeWidth="2.5"
             strokeLinecap="round"
             initial={false}
             animate={{ pathLength: progress, opacity: progress > 0 ? 1 : 0 }}
-            transition={{ duration: 0.6, ease: [0.77, 0, 0.175, 1] }}
+            transition={{ duration: 0.9, ease: [0.77, 0, 0.175, 1] }}
           />
         </svg>
       )}
