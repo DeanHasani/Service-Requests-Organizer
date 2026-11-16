@@ -6,17 +6,10 @@ import { toast } from 'sonner';
 import type { ServiceRequest } from '@deskflow/shared';
 import { useCurrentUser } from '../lib/auth';
 import { useAssign, useAssignees, useRequests } from '../lib/queries';
-import { errorMessage } from '../lib/api';
+import { ErrorState } from '../components/errors';
+import { UnassignedSkeleton } from '../components/skeletons';
 import { formatDate, formatDateTime, timeAgo } from '../lib/format';
-import {
-  Button,
-  EmptyState,
-  ErrorState,
-  PageHeader,
-  Panel,
-  Select,
-  Skeleton,
-} from '../components/ui';
+import { Button, EmptyState, PageHeader, Panel, Select } from '../components/ui';
 import { PriorityBadge, RequestRef, SourceLabel } from '../components/request-bits';
 import { Pagination } from './RequestsPage';
 
@@ -39,16 +32,9 @@ export function UnassignedPage() {
       />
       <Panel className="overflow-hidden">
         {list.isPending ? (
-          <div aria-busy="true" aria-label="Loading requests" className="divide-y divide-line">
-            {Array.from({ length: 4 }, (_, i) => (
-              <div key={i} className="space-y-2.5 px-4 py-4">
-                <Skeleton className="w-1/3" />
-                <Skeleton className="w-2/3" />
-              </div>
-            ))}
-          </div>
+          <UnassignedSkeleton />
         ) : list.isError ? (
-          <ErrorState message={errorMessage(list.error)} onRetry={() => void list.refetch()} />
+          <ErrorState error={list.error} onRetry={() => void list.refetch()} />
         ) : list.data.items.length === 0 ? (
           <EmptyState
             icon={<CheckCircle2 />}

@@ -11,6 +11,8 @@ import {
 import { useCurrentUser } from '../lib/auth';
 import { useCreateUser, useSetUserActive, useTeam } from '../lib/queries';
 import { ApiError, errorMessage } from '../lib/api';
+import { ErrorState } from '../components/errors';
+import { TeamSkeleton } from '../components/skeletons';
 import { cx } from '../lib/format';
 import {
   Avatar,
@@ -18,13 +20,11 @@ import {
   ConfirmDialog,
   Dialog,
   EmptyState,
-  ErrorState,
   Field,
   Input,
   PageHeader,
   Panel,
   Select,
-  Skeleton,
 } from '../components/ui';
 
 export function TeamPage() {
@@ -52,16 +52,9 @@ export function TeamPage() {
       />
       <Panel className="overflow-hidden">
         {team.isPending ? (
-          <div aria-busy="true" aria-label="Loading team" className="divide-y divide-line">
-            {Array.from({ length: 4 }, (_, i) => (
-              <div key={i} className="flex items-center gap-4 px-4 py-4">
-                <Skeleton className="size-8 rounded-full" />
-                <Skeleton className="w-40" />
-              </div>
-            ))}
-          </div>
+          <TeamSkeleton />
         ) : team.isError ? (
-          <ErrorState message={errorMessage(team.error)} onRetry={() => void team.refetch()} />
+          <ErrorState error={team.error} onRetry={() => void team.refetch()} />
         ) : team.data.length === 0 ? (
           <EmptyState icon={<Users />} title="No team members yet" />
         ) : (

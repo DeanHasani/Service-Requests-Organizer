@@ -27,19 +27,10 @@ import {
 } from '@deskflow/shared';
 import { useAssignees, useRequests } from '../lib/queries';
 import { useCurrentUser } from '../lib/auth';
-import { errorMessage } from '../lib/api';
+import { ErrorState } from '../components/errors';
+import { RequestListSkeleton } from '../components/skeletons';
 import { cx, formatDateTime, formatShortDate } from '../lib/format';
-import {
-  Avatar,
-  Button,
-  EmptyState,
-  ErrorState,
-  Input,
-  PageHeader,
-  Panel,
-  Select,
-  Skeleton,
-} from '../components/ui';
+import { Avatar, Button, EmptyState, Input, PageHeader, Panel, Select } from '../components/ui';
 import {
   LifecycleRail,
   PriorityBadge,
@@ -227,9 +218,9 @@ export function RequestsPage({ scope }: { scope: Scope }) {
         </div>
 
         {list.isPending ? (
-          <LoadingRows />
+          <RequestListSkeleton />
         ) : list.isError ? (
-          <ErrorState message={errorMessage(list.error)} onRetry={() => void list.refetch()} />
+          <ErrorState error={list.error} onRetry={() => void list.refetch()} />
         ) : list.data.items.length === 0 ? (
           hasFilters ? (
             <EmptyState
@@ -519,25 +510,6 @@ function MobileList({ items }: { items: ServiceRequest[] }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-function LoadingRows() {
-  return (
-    <div aria-busy="true" aria-label="Loading requests">
-      {Array.from({ length: 8 }, (_, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-6 border-b border-line px-4 py-3.5 last:border-b-0"
-        >
-          <Skeleton className="w-20" />
-          <Skeleton className="flex-1" />
-          <Skeleton className="hidden w-24 md:block" />
-          <Skeleton className="hidden w-20 md:block" />
-          <Skeleton className="w-16" />
-        </div>
-      ))}
-    </div>
   );
 }
 

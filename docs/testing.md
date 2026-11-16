@@ -40,9 +40,10 @@ Last full run: 16 November 2026, Windows 11, Node 25.8.2, Chromium (Playwright 1
 | API       | `server/tests/notes-and-permissions.test.ts` | 18      | passed                   |
 | Frontend  | `client/src/test/app.test.tsx`               | 21      | passed                   |
 | Frontend  | `client/src/test/safe-next.test.ts`          | 6       | passed                   |
+| Frontend  | `client/src/test/errors.test.tsx`            | 11      | passed                   |
 | E2E       | `tests/e2e/journey.spec.ts`                  | 3       | passed                   |
 | E2E       | `tests/e2e/responsive.spec.ts`               | 6       | passed                   |
-| **Total** |                                              | **115** | **115 passed, 0 failed** |
+| **Total** |                                              | **126** | **126 passed, 0 failed** |
 
 `npm run typecheck` and `npm run lint` report no errors. `prettier --check` is clean.
 
@@ -85,6 +86,10 @@ data written through the API is read back through a fresh database connection (A
 ### Frontend
 
 sign-in validation, server error message, password visibility toggle, redirect to the requested page after sign-in, redirect to sign-in without a session; request list loading, first-run empty, filtered empty, error with retry, search and filter parameters sent to the server, personal empty state on My requests; create form validation, successful create with idempotency key and CSRF header, employee assignee options; request details, notes empty state and history; status change sends the version it read; Start work disabled without an assignee; work controls hidden from non-owners; empty note rejected and valid note added; not-found state; post-login redirect guard rejects off-site and `/\host` paths.
+
+### Error pages and loading
+
+Each kind of failure has its own screen with a specific message and a way out: page not found (with the address shown), request not found, no access (403), server error (500) with retry, server unreachable, and a crash screen if a page fails to render. When the session check fails on startup, a full-screen page offers a retry. When only one section fails, such as the notes on a request page, that section shows the error and the rest of the page keeps working. While data loads, every page shows a skeleton in the shape of its real sections, including the whole app while the session is checked. Tests cover each of these screens and the switch from skeleton to data.
 
 ### Responsive layout
 

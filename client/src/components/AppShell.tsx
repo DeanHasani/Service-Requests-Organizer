@@ -7,6 +7,7 @@ import { useAuth, useCurrentUser } from '../lib/auth';
 import { useDashboard } from '../lib/queries';
 import { cx } from '../lib/format';
 import { Avatar } from './ui';
+import { ErrorBoundary } from './errors';
 
 function Logo() {
   return (
@@ -190,7 +191,9 @@ export function AppShell() {
           animate={{ opacity: 1, transform: 'translateY(0px)' }}
           transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
         >
-          <Outlet />
+          <ErrorBoundary key={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </motion.div>
       </main>
     </div>

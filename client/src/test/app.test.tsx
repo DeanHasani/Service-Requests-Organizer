@@ -112,7 +112,7 @@ describe('request list', () => {
           : { body: { data: page([makeRequest()]) } },
     });
     renderApp('/requests');
-    expect(await screen.findByText('This didn’t load')).toBeInTheDocument();
+    expect(await screen.findByText('The server ran into a problem')).toBeInTheDocument();
     fail = false;
     await userEvent.click(screen.getByRole('button', { name: /Try again/ }));
     expect(await screen.findAllByText('Printer on 2nd floor offline')).not.toHaveLength(0);
@@ -335,6 +335,6 @@ describe('request details', () => {
   it('shows a not-found state for a missing request', async () => {
     mockApi({ ...signedInAs(manager) });
     renderApp('/requests/999');
-    expect(await screen.findByText('This request doesn’t exist')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Request not found' })).toBeInTheDocument();
   });
 });

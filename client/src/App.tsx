@@ -6,6 +6,8 @@ import { Toaster } from 'sonner';
 import { ApiError } from './lib/api';
 import { AuthProvider, useAuth } from './lib/auth';
 import { AppShell } from './components/AppShell';
+import { ErrorPage, errorKind } from './components/errors';
+import { AppSkeleton } from './components/skeletons';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { RequestsPage } from './pages/RequestsPage';
@@ -30,13 +32,23 @@ export function makeQueryClient() {
 }
 
 function RequireAuth() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, bootError, retryBoot } = useAuth();
   const location = useLocation();
-  if (isLoading) {
+  if (isLoading) return <AppSkeleton />;
+  if (bootError) {
+    const offline = errorKind(bootError) === 'offline';
     return (
-      <div className="grid min-h-dvh place-items-center" aria-busy="true" aria-label="Loading">
-        <span className="df-skeleton size-8 rounded-full" />
-      </div>
+      <ErrorPage
+        kind={errorKind(bootError)}
+        fullScreen
+        title={offline ? 'Can’t reach DESKFLOW' : 'DESKFLOW couldn’t start'}
+        body={
+          offline
+            ? 'The server is not answering. Make sure it is running, then try again.'
+            : 'The server returned an error while checking your session. Try again in a moment.'
+        }
+        onRetry={retryBoot}
+      />
     );
   }
   if (!user)

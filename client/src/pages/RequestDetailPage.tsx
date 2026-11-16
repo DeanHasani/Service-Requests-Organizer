@@ -6,7 +6,6 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
   CheckCircle2,
-  FileQuestion,
   Hand,
   MessageSquareText,
   PencilLine,
@@ -40,6 +39,8 @@ import {
   useUpdateRequest,
 } from '../lib/queries';
 import { ApiError, errorMessage } from '../lib/api';
+import { ErrorPage, ErrorState, errorKind } from '../components/errors';
+import { ActivitySkeleton, NotesSkeleton, RequestDetailSkeleton } from '../components/skeletons';
 import { formatDateTime, timeAgo } from '../lib/format';
 import { ActivityList } from '../components/ActivityList';
 import {
@@ -47,14 +48,11 @@ import {
   Button,
   ConfirmDialog,
   Dialog,
-  EmptyState,
-  ErrorState,
   Field,
   Input,
   Panel,
   PanelHeader,
   Select,
-  Skeleton,
   Textarea,
 } from '../components/ui';
 import {
@@ -69,28 +67,26 @@ export function RequestDetailPage() {
   const id = Number(useParams().id);
   const q = useRequest(id);
 
-  if (q.isPending) return <DetailSkeleton />;
+  if (q.isPending) return <RequestDetailSkeleton />;
   if (q.isError) {
-    const missing =
-      q.error instanceof ApiError && (q.error.status === 404 || q.error.status === 400);
-    return (
-      <Panel>
-        {missing ? (
-          <EmptyState
-            icon={<FileQuestion />}
-            title="This request doesn’t exist"
-            body="It may have the wrong number in the address. Check the reference and try again."
-            action={
-              <Link to="/requests" className="text-sm font-medium text-cobalt hover:underline">
-                Back to all requests
-              </Link>
-            }
-          />
-        ) : (
-          <ErrorState message={errorMessage(q.error)} onRetry={() => void q.refetch()} />
-        )}
-      </Panel>
-    );
+    const kind = errorKind(q.error);
+    if (kind === 'notFound') {
+      return (
+        <ErrorPage
+          kind="notFound"
+          title="Request not found"
+          body="There is no request at this address. The number may be mistyped, or the link is old."
+        >
+          <Link
+            to="/requests"
+            className="mt-4 inline-block text-sm font-medium text-cobalt hover:underline"
+          >
+            Search all requests
+          </Link>
+        </ErrorPage>
+      );
+    }
+    return <ErrorPage kind={kind} onRetry={() => void q.refetch()} />;
   }
   return <RequestView request={q.data} />;
 }
@@ -552,12 +548,9 @@ function NotesPanel({ request: r, mayWork }: { request: ServiceRequest; mayWork:
       <PanelHeader title={`Internal notes${notes.data?.length ? ` (${notes.data.length})` : ''}`} />
       <div className="px-4 py-4">
         {notes.isPending ? (
-          <div className="space-y-3">
-            <Skeleton className="w-2/3" />
-            <Skeleton className="w-1/2" />
-          </div>
+          <NotesSkeleton />
         ) : notes.isError ? (
-          <ErrorState message={errorMessage(notes.error)} onRetry={() => void notes.refetch()} />
+          <ErrorState error={notes.error} onRetry={() => void notes.refetch()} />
         ) : notes.data.length === 0 ? (
           <p className="flex items-center gap-2 py-2 text-[13px] text-ink-3">
             <MessageSquareText className="size-4" aria-hidden /> No internal notes yet.
@@ -645,30 +638,13 @@ function ActivityPanel({ requestId }: { requestId: number }) {
       <PanelHeader title="Activity history" />
       <div className="px-4 py-4">
         {q.isPending ? (
-          <div className="space-y-3">
-            <Skeleton className="w-3/4" />
-            <Skeleton className="w-1/2" />
-          </div>
+          <ActivitySkeleton rows={3} />
         ) : q.isError ? (
-          <ErrorState message={errorMessage(q.error)} onRetry={() => void q.refetch()} />
+          <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         ) : (
           <ActivityList items={q.data} />
         )}
       </div>
     </Panel>
-  );
-}
-
-function DetailSkeleton() {
-  return (
-    <div aria-busy="true" aria-label="Loading request">
-      <Skeleton className="mb-5 w-24" />
-      <Skeleton className="mb-3 w-40" />
-      <Skeleton className="mb-8 h-6 w-2/3" />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <Panel className="h-56">{null}</Panel>
-        <Panel className="h-80">{null}</Panel>
-      </div>
-    </div>
   );
 }

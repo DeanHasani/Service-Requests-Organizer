@@ -3,12 +3,13 @@ import {
   useId,
   useRef,
   type ButtonHTMLAttributes,
+  type CSSProperties,
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react';
-import { AlertTriangle, ChevronDown, Loader2, RotateCw, X } from 'lucide-react';
+import { ChevronDown, Loader2, X } from 'lucide-react';
 import { cx, initials } from '../lib/format';
 
 // ---------- Button ----------
@@ -213,8 +214,8 @@ export function PanelHeader({
   );
 }
 
-export function Skeleton({ className }: { className?: string }) {
-  return <span aria-hidden className={cx('df-skeleton block h-3.5', className)} />;
+export function Skeleton({ className, style }: { className?: string; style?: CSSProperties }) {
+  return <span aria-hidden style={style} className={cx('df-skeleton block h-3.5', className)} />;
 }
 
 export function EmptyState({
@@ -240,23 +241,6 @@ export function EmptyState({
       <p className="font-medium text-ink">{title}</p>
       {body && <p className="mt-1 max-w-sm text-[13px] text-ink-2">{body}</p>}
       {action && <div className="mt-4">{action}</div>}
-    </div>
-  );
-}
-
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <div role="alert" className="flex flex-col items-center px-6 py-12 text-center">
-      <span className="mb-3 grid size-10 place-items-center rounded-full bg-urgent-soft text-urgent">
-        <AlertTriangle className="size-5" aria-hidden />
-      </span>
-      <p className="font-medium text-ink">This didn’t load</p>
-      <p className="mt-1 max-w-sm text-[13px] text-ink-2">{message}</p>
-      {onRetry && (
-        <Button className="mt-4" size="sm" onClick={onRetry}>
-          <RotateCw className="size-3.5" aria-hidden /> Try again
-        </Button>
-      )}
     </div>
   );
 }

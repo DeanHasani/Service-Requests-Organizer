@@ -4,18 +4,11 @@ import { Activity as ActivityIcon, ArrowUpRight, Inbox, Plus, UserPlus } from 'l
 import type { DashboardSummary } from '@deskflow/shared';
 import { useCurrentUser } from '../lib/auth';
 import { useActivityFeed, useDashboard, useRequests } from '../lib/queries';
-import { errorMessage } from '../lib/api';
+import { ErrorState } from '../components/errors';
+import { ActivitySkeleton, RecentRowsSkeleton } from '../components/skeletons';
 import { cx, timeAgo } from '../lib/format';
 import { ActivityList } from '../components/ActivityList';
-import {
-  Avatar,
-  EmptyState,
-  ErrorState,
-  PageHeader,
-  Panel,
-  PanelHeader,
-  Skeleton,
-} from '../components/ui';
+import { Avatar, EmptyState, PageHeader, Panel, PanelHeader, Skeleton } from '../components/ui';
 import { LifecycleRail, PriorityBadge, RequestRef } from '../components/request-bits';
 
 const greeting = () => {
@@ -42,10 +35,7 @@ export function DashboardPage() {
       />
       {summary.isError ? (
         <Panel>
-          <ErrorState
-            message={errorMessage(summary.error)}
-            onRetry={() => void summary.refetch()}
-          />
+          <ErrorState error={summary.error} onRetry={() => void summary.refetch()} />
         </Panel>
       ) : (
         <StatusLedger data={summary.data} isManager={user.role === 'MANAGER'} />
@@ -204,17 +194,9 @@ function RecentRequests() {
         }
       />
       {q.isPending ? (
-        <ul className="divide-y divide-line">
-          {Array.from({ length: 5 }, (_, i) => (
-            <li key={i} className="flex items-center gap-4 px-4 py-3.5">
-              <Skeleton className="w-14" />
-              <Skeleton className="flex-1" />
-              <Skeleton className="w-16" />
-            </li>
-          ))}
-        </ul>
+        <RecentRowsSkeleton />
       ) : q.isError ? (
-        <ErrorState message={errorMessage(q.error)} onRetry={() => void q.refetch()} />
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       ) : q.data.items.length === 0 ? (
         <EmptyState
           icon={<Inbox />}
@@ -277,19 +259,9 @@ function RecentActivity() {
       <PanelHeader title="Recent activity" />
       <div className="px-4 py-4">
         {q.isPending ? (
-          <div className="flex flex-col gap-4">
-            {Array.from({ length: 5 }, (_, i) => (
-              <div key={i} className="flex gap-3">
-                <Skeleton className="size-6 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="w-4/5" />
-                  <Skeleton className="w-1/4" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <ActivitySkeleton />
         ) : q.isError ? (
-          <ErrorState message={errorMessage(q.error)} onRetry={() => void q.refetch()} />
+          <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         ) : q.data.length === 0 ? (
           <EmptyState
             compact

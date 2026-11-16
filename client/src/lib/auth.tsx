@@ -8,6 +8,9 @@ import { api, ApiError, setCsrfToken, setUnauthorizedHandler } from './api';
 type AuthValue = {
   user: User | null;
   isLoading: boolean;
+  /** Set when the session check itself failed (server unreachable or erroring). */
+  bootError: unknown;
+  retryBoot: () => void;
   login: (input: LoginInput) => Promise<User>;
   logout: () => Promise<void>;
 };
@@ -62,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user: me.data ?? null,
       isLoading: me.isPending,
+      bootError: me.isError ? me.error : null,
+      retryBoot: () => void me.refetch(),
       login: async (input) => (await loginMutation.mutateAsync(input)).user,
       logout: async () => {
         try {
@@ -74,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [me.data, me.isPending, loginMutation, qc, navigate],
+    [me, loginMutation, qc, navigate],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;
