@@ -9,7 +9,8 @@ import type { z } from 'zod';
 import { useAuth } from '../lib/auth';
 import { errorMessage } from '../lib/api';
 import { Button, Field, Input } from '../components/ui';
-import { LifecycleRail } from '../components/request-bits';
+import { GlassCard, Depth } from '../components/GlassCard';
+import { HeroRail } from '../components/HeroRail';
 
 /** Only allow same-app paths as the post-login destination (browsers read `/\host` as `//host`). */
 export const safeNext = (next: string | null) =>
@@ -42,34 +43,45 @@ export function LoginPage() {
   });
 
   return (
-    <div className="grid min-h-dvh lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-navy p-12 text-navy-ink lg:flex">
-        <span className="flex items-center gap-2.5">
-          <svg viewBox="0 0 32 32" className="size-8" aria-hidden>
-            <rect width="32" height="32" rx="7" fill="#24344d" />
-            <path d="M9 16h14" stroke="#4b5d7a" strokeWidth="2" />
-            <circle cx="9" cy="16" r="3" fill="#8fa8f5" />
-            <circle cx="16" cy="16" r="3" fill="#e0a23b" />
-            <circle cx="23" cy="16" r="3" fill="#4fb286" />
-          </svg>
-          <span className="text-base font-bold tracking-[0.06em] text-white">DESKFLOW</span>
-        </span>
-        <div className="max-w-md">
-          <p className="text-[28px] leading-[1.2] font-semibold tracking-[-0.02em] text-white">
-            Every request has an owner, a status and a history.
-          </p>
-          <p className="mt-4 text-[15px] leading-relaxed">
-            Log every call, email and message in one queue. Each request gets one owner, and every
-            change is recorded with a name and a time.
-          </p>
-          <div className="mt-10 rounded-[12px] border border-white/10 bg-navy-2 p-5">
-            <LoginRailDemo />
+    <div className="grid min-h-dvh bg-canvas lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
+      <div className="hidden p-5 lg:block xl:p-6">
+        <GlassCard className="h-full">
+          <div className="flex h-full flex-col justify-between p-12 xl:p-14">
+            <Depth z={40} className="flex items-center gap-3.5">
+              <svg
+                viewBox="0 0 32 32"
+                className="size-12 drop-shadow-[0_8px_18px_rgb(0_0_0/0.35)]"
+                aria-hidden
+              >
+                <rect width="32" height="32" rx="7" fill="#24344d" />
+                <path d="M9 16h14" stroke="#4b5d7a" strokeWidth="2" />
+                <circle cx="9" cy="16" r="3" fill="#8fa8f5" />
+                <circle cx="16" cy="16" r="3" fill="#e0a23b" />
+                <circle cx="23" cy="16" r="3" fill="#4fb286" />
+              </svg>
+              <span className="text-2xl font-bold tracking-[0.08em] text-white">DESKFLOW</span>
+            </Depth>
+
+            <div className="max-w-xl">
+              <Depth z={60}>
+                <h2 className="text-[44px] leading-[1.08] font-semibold tracking-[-0.03em] text-balance text-white xl:text-[52px]">
+                  Every request has an owner, a status and a history.
+                </h2>
+                <p className="mt-5 text-lg text-navy-ink">
+                  Log every call, email and message in one queue.
+                </p>
+              </Depth>
+              <Depth z={90} className="mt-14">
+                <LoginRailDemo />
+              </Depth>
+            </div>
+
+            <Depth z={20}>
+              <p className="text-xs text-navy-ink-dim">© 2026 GROWIN AL</p>
+            </Depth>
           </div>
-        </div>
-        <p className="text-xs text-navy-ink-dim">
-          Internal tool. Accounts are created by a manager.
-        </p>
-      </aside>
+        </GlassCard>
+      </div>
 
       <main className="flex items-center justify-center px-4 py-12 sm:px-8">
         <div className="w-full max-w-sm">
@@ -144,23 +156,23 @@ export function LoginPage() {
 }
 
 /** A slow loop of the lifecycle rail: the product's one idea, shown instead of described. */
-const DEMO_STEPS = ['OPEN', 'IN_PROGRESS', 'RESOLVED'] as const;
+const DEMO_STEPS = 3;
 
 function LoginRailDemo() {
   const reduce = useReducedMotion();
   const [i, setI] = useState(reduce ? 1 : 0);
+  const [pausedUntil, setPausedUntil] = useState(0);
   useEffect(() => {
     if (reduce) return;
-    const t = setInterval(() => setI((n) => (n + 1) % DEMO_STEPS.length), 2200);
+    const t = setInterval(() => {
+      if (Date.now() < pausedUntil) return;
+      setI((n) => (n + 1) % DEMO_STEPS);
+    }, 2000);
     return () => clearInterval(t);
-  }, [reduce]);
-  return (
-    <div>
-      <div className="mb-4 flex items-center justify-between gap-4 text-[13px]">
-        <span className="font-medium text-white">Printer on 2nd floor not connecting</span>
-        <span className="tabular text-xs text-navy-ink-dim">SR-000001</span>
-      </div>
-      <LifecycleRail status={DEMO_STEPS[i]!} size="lg" onDark />
-    </div>
-  );
+  }, [reduce, pausedUntil]);
+  const pick = (n: number) => {
+    setI(n);
+    setPausedUntil(Date.now() + 6000);
+  };
+  return <HeroRail at={i} onPick={pick} />;
 }
