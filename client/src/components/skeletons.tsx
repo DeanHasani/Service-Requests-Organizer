@@ -262,7 +262,11 @@ export function TeamSkeleton({ rows = 4 }: { rows?: number }) {
 /** Shown while the app checks the session on first load: the real shell, filled with placeholders. */
 export function AppSkeleton() {
   return (
-    <div className="min-h-dvh lg:pl-60" aria-busy="true" aria-label="Loading DESKFLOW">
+    <div
+      className="min-h-dvh lg:bg-navy lg:py-3 lg:pr-3 lg:pl-60"
+      aria-busy="true"
+      aria-label="Loading DESKFLOW"
+    >
       <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col bg-navy px-3 lg:flex">
         <div className="flex h-16 items-center gap-2.5 px-2">
           <span className="size-7 rounded-[7px] bg-navy-3" />
@@ -280,18 +284,20 @@ export function AppSkeleton() {
       <header className="flex h-14 items-center bg-navy px-4 lg:hidden">
         <span className="size-7 rounded-[7px] bg-navy-3" />
       </header>
-      <main className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        <PageHeaderSkeleton />
-        <Panel className="mb-6 h-28">{null}</Panel>
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <Panel>
-            <RecentRowsSkeleton rows={5} />
-          </Panel>
-          <Panel className="p-4">
-            <ActivitySkeleton rows={4} />
-          </Panel>
-        </div>
-      </main>
+      <div className="lg:min-h-[calc(100dvh-24px)] lg:rounded-[20px] lg:bg-canvas lg:shadow-[0_1px_0_rgb(255_255_255/0.04)]">
+        <main className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <PageHeaderSkeleton />
+          <Panel className="mb-6 h-28">{null}</Panel>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <Panel>
+              <RecentRowsSkeleton rows={5} />
+            </Panel>
+            <Panel className="p-4">
+              <ActivitySkeleton rows={4} />
+            </Panel>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

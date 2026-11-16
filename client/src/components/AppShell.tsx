@@ -122,7 +122,7 @@ export function AppShell() {
   useEffect(() => setDrawer(false), [location.pathname]);
 
   return (
-    <div className="min-h-dvh lg:pl-60">
+    <div className="min-h-dvh lg:bg-navy lg:py-3 lg:pr-3 lg:pl-60">
       <a
         href="#main"
         className="sr-only z-50 rounded-md bg-surface px-3 py-2 focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
@@ -184,18 +184,21 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
-      <main id="main" className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        <motion.div
-          key={location.pathname}
-          initial={{ opacity: 0, transform: 'translateY(6px)' }}
-          animate={{ opacity: 1, transform: 'translateY(0px)' }}
-          transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
-        >
-          <ErrorBoundary key={location.pathname}>
-            <Outlet />
-          </ErrorBoundary>
-        </motion.div>
-      </main>
+      {/* On desktop the page sits on a rounded sheet; the navy sidebar colour wraps around it. */}
+      <div className="lg:min-h-[calc(100dvh-24px)] lg:rounded-[20px] lg:bg-canvas lg:shadow-[0_1px_0_rgb(255_255_255/0.04)]">
+        <main id="main" className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, transform: 'translateY(6px)' }}
+            animate={{ opacity: 1, transform: 'translateY(0px)' }}
+            transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+          >
+            <ErrorBoundary key={location.pathname}>
+              <Outlet />
+            </ErrorBoundary>
+          </motion.div>
+        </main>
+      </div>
     </div>
   );
 }

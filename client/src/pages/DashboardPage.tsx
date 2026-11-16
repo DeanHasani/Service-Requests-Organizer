@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { motion } from 'motion/react';
-import { Activity as ActivityIcon, ArrowUpRight, Inbox, Plus, UserPlus } from 'lucide-react';
+import { Activity as ActivityIcon, ArrowUpRight, Inbox, UserPlus } from 'lucide-react';
 import type { DashboardSummary } from '@deskflow/shared';
 import { useCurrentUser } from '../lib/auth';
 import { useActivityFeed, useDashboard, useRequests } from '../lib/queries';
@@ -24,14 +24,6 @@ export function DashboardPage() {
       <PageHeader
         title="Dashboard"
         subtitle={`${greeting()}, ${user.name.split(' ')[0]}. Here is where the queue stands.`}
-        actions={
-          <Link
-            to="/requests/new"
-            className="inline-flex h-9 items-center gap-2 rounded-control bg-navy px-3.5 text-sm font-medium text-white transition-[background-color,transform] duration-150 hover:bg-navy-3 active:scale-[0.97]"
-          >
-            <Plus className="size-4" aria-hidden /> New request
-          </Link>
-        }
       />
       {summary.isError ? (
         <Panel>
@@ -97,19 +89,19 @@ function StatusLedger({ data, isManager }: { data?: DashboardSummary; isManager:
           <Link
             key={c.label}
             to={c.to}
-            className="group border-b border-line px-5 py-4 transition-colors hover:bg-canvas lg:border-b-0"
+            className="group flex flex-col justify-between gap-3 border-b border-line px-5 py-5 transition-colors hover:bg-canvas lg:border-b-0"
           >
-            <span className="flex items-center gap-1.5 text-[13px] text-ink-2">
-              {c.dot && <span aria-hidden className={cx('size-1.5 rounded-full', c.dot)} />}
+            <span className="flex items-center gap-2 text-[15px] font-medium text-ink-2">
+              {c.dot && <span aria-hidden className={cx('size-2 rounded-full', c.dot)} />}
               {c.label}
             </span>
             <span
               className={cx(
-                'tabular mt-1.5 block text-[26px] leading-none font-semibold tracking-[-0.02em]',
+                'tabular block text-[40px] leading-none font-semibold tracking-[-0.03em]',
                 c.alert && 'text-high',
               )}
             >
-              {c.value ?? <Skeleton className="h-6 w-10" />}
+              {c.value ?? <Skeleton className="h-10 w-14" />}
             </span>
           </Link>
         ))}
@@ -117,13 +109,13 @@ function StatusLedger({ data, isManager }: { data?: DashboardSummary; isManager:
           to={card?.to ?? (isManager ? '/team' : '/my')}
           className="col-span-2 flex flex-col justify-between gap-2 bg-navy px-5 py-4 text-navy-ink transition-colors hover:bg-navy-2 sm:col-span-3 lg:col-span-1"
         >
-          <span className="flex items-center justify-between text-[13px]">
+          <span className="flex items-center justify-between text-[15px] font-medium">
             {isManager ? 'Team workload' : 'My workload'}{' '}
             <ArrowUpRight className="size-4 opacity-70" aria-hidden />
           </span>
           {card ? (
             <span className="text-[13px]">
-              <span className="tabular text-[26px] leading-none font-semibold tracking-[-0.02em] text-white">
+              <span className="tabular text-[40px] leading-none font-semibold tracking-[-0.03em] text-white">
                 {card.value}
               </span>{' '}
               active

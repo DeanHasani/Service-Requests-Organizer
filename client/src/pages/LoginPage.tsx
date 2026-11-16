@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,8 +27,10 @@ const TONE = { open: '#5b7ff0', progress: '#e8a23e', done: '#3fa56f' };
 const EMPTY = { fill: '#111c30', ring: '#3a4963', label: '#7d8aa3' };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Distance from the card's bottom edge to the centre of the Done stop (padding 40 + half of 64). */
-const DONE_CENTER = 72;
+/** Stop diameter in px. */
+const DOT = 72;
+/** Distance from the card's bottom edge to where the rail line meets it (and the outline starts). */
+const RAIL_Y = 150;
 
 /**
  * One timeline, `t` from 0 to 1, drives every part in order so nothing happens at once:
@@ -41,6 +43,39 @@ const SEG = {
   border: [0.42, 0.9],
   done: [0.9, 0.97],
 } as const;
+
+/**
+ * Phones have no room for the rail beside the card, so a mini rail (Open, In progress, Done)
+ * sits inside the card instead. Its line runs across the whole timeline while the border fills
+ * at the same time, and both finish as Done lights up.
+ */
+const SEG_MOBILE = {
+  line1: [0.04, 0.42],
+  progress: [0.42, 0.47],
+  line2: [0.47, 0.9],
+  border: [0.04, 0.9],
+  done: SEG.done,
+} as const;
+/** Mini rail stop diameter, and where its centre sits above the card's bottom edge (padding 32). */
+const MINI_DOT = 40;
+const MINI_RAIL_Y = 32 + MINI_DOT / 2;
+
+/** True on screens wide enough for the rail beside the card (Tailwind's `lg`). */
+function useDesktop() {
+  const query = '(min-width: 1024px)';
+  const [desktop, setDesktop] = useState(
+    () => typeof window !== 'undefined' && !!window.matchMedia?.(query).matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia?.(query);
+    if (!mq) return;
+    const onChange = () => setDesktop(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return desktop;
+}
 
 /** Typing fills the timeline up to the end of the border; a successful sign-in plays Done. */
 const typedToTime = (typed: number) =>
@@ -73,6 +108,7 @@ export function LoginPage() {
   const interactive = typed > 0 || finishing || done;
   const target = done ? 1 : isSubmitting ? SEG.border[1] : typedToTime(typed);
   const t = useTimeline(interactive, target, !!reduce);
+  const desktop = useDesktop();
 
   if (user && !finishing) return <Navigate to={safeNext(params.get('next'))} replace />;
 
@@ -102,27 +138,23 @@ export function LoginPage() {
         ].join(','),
       }}
     >
-      <div className="grid w-full max-w-6xl gap-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-0">
+      <div className="grid w-full max-w-6xl gap-10 lg:grid-cols-[minmax(0,1fr)_370px] lg:gap-0">
         {/* Left: brand, sentences, then the rail. Its line ends at the card's edge. */}
         <div className="flex flex-col justify-end">
-          <header className="text-center lg:px-10">
-            <div className="flex items-center justify-center gap-4">
-              <Logo className="size-12 sm:size-14" />
-              <span className="text-3xl font-bold tracking-[0.08em] text-white sm:text-5xl">
-                DESKFLOW
-              </span>
-            </div>
-            <h2 className="mx-auto mt-7 max-w-xl text-2xl leading-tight font-semibold tracking-[-0.02em] text-balance text-white sm:text-[32px]">
+          {/* Extra left padding centres the text over the In progress stop (56px right of centre). */}
+          <header className="text-center lg:pr-10 lg:pl-[152px]">
+            <span className="block pl-[0.08em] text-2xl font-bold tracking-[0.08em] text-white sm:text-4xl">
+              DESKFLOW
+            </span>
+            <Logo className="mx-auto mt-5 block h-4 w-12 sm:h-5 sm:w-15" />
+            <h2 className="mx-auto mt-5 max-w-xl text-xl leading-tight font-semibold tracking-[-0.02em] text-balance text-white sm:text-[28px]">
               Every request has an owner, a status and a history.
             </h2>
-            <p className="mt-3 text-base text-navy-ink sm:text-lg">
-              Log every call, email and message in one queue.
-            </p>
           </header>
 
           <div
-            className="mt-16 hidden items-center pl-10 lg:flex"
-            style={{ marginBottom: DONE_CENTER - 32 }}
+            className="mt-20 hidden items-center pl-10 lg:flex"
+            style={{ marginBottom: RAIL_Y - DOT / 2 }}
             aria-hidden
           >
             <Stop t={t} at={0} label="Open" tone={TONE.open}>
@@ -130,14 +162,14 @@ export function LoginPage() {
             </Stop>
             <Line t={t} range={SEG.line1} from={TONE.open} to={TONE.progress} />
             <Stop t={t} at={SEG.progress} label="In progress" tone={TONE.progress}>
-              <ProgressIcon t={t} reduce={!!reduce} />
+              <ProgressIcon t={t} reduce={!!reduce} from={SEG.progress[0]} />
             </Stop>
             <Line t={t} range={SEG.line2} from={TONE.progress} to={TONE.done} />
           </div>
         </div>
 
         {/* Right: the sign-in card. Its border is the last stretch; Done sits at its foot. */}
-        <main className="relative mx-auto w-full max-w-[400px]">
+        <main className="relative mx-auto w-full max-w-[310px] lg:max-w-[370px]">
           <span
             aria-hidden
             className="pointer-events-none absolute -inset-14 -z-10 rounded-[48px] opacity-90 blur-3xl"
@@ -146,7 +178,18 @@ export function LoginPage() {
                 'radial-gradient(50% 45% at 20% 25%, rgb(91 127 240 / 0.28), transparent 70%), radial-gradient(45% 45% at 85% 50%, rgb(232 162 62 / 0.2), transparent 70%), radial-gradient(50% 45% at 40% 92%, rgb(63 165 111 / 0.26), transparent 70%)',
             }}
           />
-          <ProgressCard t={t} footer={<DoneStop t={t} signedIn={done} />}>
+          <ProgressCard
+            t={t}
+            border={desktop ? SEG.border : SEG_MOBILE.border}
+            fromBottom={desktop ? RAIL_Y : MINI_RAIL_Y}
+            footer={
+              desktop ? (
+                <DoneStop t={t} signedIn={done} />
+              ) : (
+                <MiniRail t={t} signedIn={done} reduce={!!reduce} />
+              )
+            }
+          >
             <h1 className="text-2xl font-semibold tracking-[-0.02em]">Sign in</h1>
             <p className="mt-1.5 text-sm text-ink-2">Use your work email and password.</p>
 
@@ -245,7 +288,8 @@ function useTimeline(interactive: boolean, target: number, reduce: boolean) {
         if (!alive) break;
         await wait(1800);
         if (!alive) break;
-        await (current = animate(t, 0, { duration: 0.7, ease: [0.4, 0, 0.2, 1] }));
+        // Start over from the beginning instead of rewinding.
+        t.jump(0);
       }
     })();
     return () => {
@@ -260,11 +304,23 @@ function useTimeline(interactive: boolean, target: number, reduce: boolean) {
 const useSegment = (t: MotionValue<number>, [a, b]: readonly [number, number]) =>
   useTransform(t, [a, b], [0, 1], { clamp: true });
 
+/** Small zoom pop (1 → 1.18 → 1) each time `value` rises past `threshold`. */
+function usePop(value: MotionValue<number>, threshold: number) {
+  const pop = useMotionValue(1);
+  const reduce = useReducedMotion();
+  const prev = useRef(value.get());
+  useMotionValueEvent(value, 'change', (v) => {
+    if (!reduce && prev.current < threshold && v >= threshold) {
+      animate(pop, [1, 1.18, 1], { duration: 0.42, times: [0, 0.4, 1], ease: 'easeOut' });
+    }
+    prev.current = v;
+  });
+  return pop;
+}
+
 function Logo({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden>
-      <rect width="32" height="32" rx="7" fill="#24344d" />
-      <path d="M9 16h14" stroke="#4b5d7a" strokeWidth="2" />
+    <svg viewBox="5.5 12.5 21 7" className={className} aria-hidden>
       <circle cx="9" cy="16" r="3" fill="#8fa8f5" />
       <circle cx="16" cy="16" r="3" fill="#e0a23b" />
       <circle cx="23" cy="16" r="3" fill="#4fb286" />
@@ -278,12 +334,16 @@ function Stop({
   at,
   label,
   tone,
+  size = DOT,
+  small = false,
   children,
 }: {
   t: MotionValue<number>;
   at: 0 | readonly [number, number];
   label: string;
   tone: string;
+  size?: number;
+  small?: boolean;
   children: ReactNode;
 }) {
   const lit = useSegment(t, at === 0 ? [-1, 0] : at);
@@ -291,18 +351,31 @@ function Stop({
   const ring = useTransform(lit, [0, 1], [EMPTY.ring, tone]);
   const ink = useTransform(lit, [0, 1], ['#5d6c88', '#ffffff']);
   const labelInk = useTransform(lit, [0, 1], [EMPTY.label, '#ffffff']);
-  const glow = useTransform(lit, (v) => `0 0 ${34 * v}px ${-4 * v}px ${tone}`);
+  const glow = useTransform(lit, (v) => `0 0 ${20 * v}px ${-6 * v}px ${tone}`);
+  // Open is lit from the start, so it pops when the timeline sets off instead.
+  const pop = usePop(at === 0 ? t : lit, at === 0 ? 0.005 : 0.999);
   return (
     <span className="relative shrink-0">
       <motion.span
-        className="absolute bottom-full left-1/2 mb-3.5 -translate-x-1/2 text-[15px] font-semibold whitespace-nowrap"
+        className={cx(
+          'absolute bottom-full left-1/2 -translate-x-1/2 font-semibold whitespace-nowrap',
+          small ? 'mb-2 text-xs' : 'mb-3.5 text-[15px]',
+        )}
         style={{ color: labelInk }}
       >
         {label}
       </motion.span>
       <motion.span
-        className="grid size-16 place-items-center rounded-full border-[3px]"
-        style={{ backgroundColor: fill, borderColor: ring, color: ink, boxShadow: glow }}
+        className={cx('grid place-items-center rounded-full', small ? 'border-2' : 'border-[3px]')}
+        style={{
+          width: size,
+          height: size,
+          backgroundColor: fill,
+          borderColor: ring,
+          color: ink,
+          boxShadow: glow,
+          scale: pop,
+        }}
       >
         {children}
       </motion.span>
@@ -311,19 +384,33 @@ function Stop({
 }
 
 /** Dot with two arrows turning around it while work is in progress. */
-function ProgressIcon({ t, reduce }: { t: MotionValue<number>; reduce: boolean }) {
+function ProgressIcon({
+  t,
+  reduce,
+  from,
+  small = false,
+}: {
+  t: MotionValue<number>;
+  reduce: boolean;
+  /** When the spinning starts on the timeline. */
+  from: number;
+  small?: boolean;
+}) {
   const [spinning, setSpinning] = useState(false);
   useMotionValueEvent(t, 'change', (v) => {
-    const next = v >= SEG.progress[0] && v < SEG.done[0];
+    const next = v >= from && v < SEG.done[0];
     if (next !== spinning) setSpinning(next);
   });
   return (
     <span className="relative grid place-items-center">
       <RefreshCw
-        className={cx('size-8', spinning && !reduce && 'animate-[spin_2.6s_linear_infinite]')}
+        className={cx(
+          small ? 'size-5' : 'size-9',
+          spinning && !reduce && 'animate-[spin_2.6s_linear_infinite]',
+        )}
         strokeWidth={2.25}
       />
-      <span className="absolute size-2.5 rounded-full bg-current" />
+      <span className={cx('absolute rounded-full bg-current', small ? 'size-1.5' : 'size-2.5')} />
     </span>
   );
 }
@@ -334,20 +421,64 @@ function Line({
   range,
   from,
   to,
+  small = false,
 }: {
   t: MotionValue<number>;
   range: readonly [number, number];
   from: string;
   to: string;
+  small?: boolean;
 }) {
   const filled = useSegment(t, range);
   return (
-    <span className="relative h-1 min-w-12 flex-1 overflow-hidden rounded-full bg-white/10">
+    <span
+      className={cx(
+        'relative flex-1 overflow-hidden rounded-full bg-white/10',
+        small ? 'h-[3px] min-w-4' : 'h-1 min-w-12',
+      )}
+    >
       <motion.span
         className="absolute inset-0 origin-left"
         style={{ backgroundImage: `linear-gradient(90deg, ${from}, ${to})`, scaleX: filled }}
       />
     </span>
+  );
+}
+
+/** Phone version: Open, In progress and Done in a row at the foot of the card. */
+function MiniRail({
+  t,
+  signedIn,
+  reduce,
+}: {
+  t: MotionValue<number>;
+  signedIn: boolean;
+  reduce: boolean;
+}) {
+  return (
+    <div className="pt-6" aria-live="polite">
+      <span className="sr-only">{signedIn ? 'Done. Opening DESKFLOW…' : ''}</span>
+      <div className="flex items-center px-2" aria-hidden>
+        <Stop t={t} at={0} label="Open" tone={TONE.open} size={MINI_DOT} small>
+          <span className="size-2.5 rounded-full bg-white" />
+        </Stop>
+        <Line t={t} range={SEG_MOBILE.line1} from={TONE.open} to={TONE.progress} small />
+        <Stop
+          t={t}
+          at={SEG_MOBILE.progress}
+          label="In progress"
+          tone={TONE.progress}
+          size={MINI_DOT}
+          small
+        >
+          <ProgressIcon t={t} reduce={reduce} from={SEG_MOBILE.progress[0]} small />
+        </Stop>
+        <Line t={t} range={SEG_MOBILE.line2} from={TONE.progress} to={TONE.done} small />
+        <Stop t={t} at={SEG_MOBILE.done} label="Done" tone={TONE.done} size={MINI_DOT} small>
+          <Check className="size-5" strokeWidth={3} />
+        </Stop>
+      </div>
+    </div>
   );
 }
 
@@ -358,62 +489,97 @@ function DoneStop({ t, signedIn }: { t: MotionValue<number>; signedIn: boolean }
   const ring = useTransform(lit, [0, 1], ['#d6d1c9', TONE.done]);
   const ink = useTransform(lit, [0, 1], ['#c3bdb3', '#ffffff']);
   const labelInk = useTransform(lit, [0, 1], ['#8a8f99', TONE.done]);
-  const scale = useTransform(lit, [0, 1], [0.92, 1]);
-  const glow = useTransform(lit, (v) => `0 0 ${30 * v}px ${-4 * v}px ${TONE.done}`);
+  const grow = useTransform(lit, [0, 1], [0.92, 1]);
+  const pop = usePop(lit, 0.999);
+  const scale = useTransform(() => grow.get() * pop.get());
+  const glow = useTransform(lit, (v) => `0 0 ${18 * v}px ${-6 * v}px ${TONE.done}`);
   return (
     <div className="flex flex-col items-center gap-3" aria-live="polite">
       <motion.span className="text-sm font-semibold" style={{ color: labelInk }}>
         {signedIn ? 'Done. Opening DESKFLOW…' : 'Done'}
       </motion.span>
       <motion.span
-        className="grid size-16 place-items-center rounded-full border-[3px]"
-        style={{ backgroundColor: fill, borderColor: ring, color: ink, scale, boxShadow: glow }}
+        className="grid place-items-center rounded-full border-[3px]"
+        style={{
+          width: DOT,
+          height: DOT,
+          backgroundColor: fill,
+          borderColor: ring,
+          color: ink,
+          scale,
+          boxShadow: glow,
+        }}
       >
-        <Check className="size-7" strokeWidth={3} aria-hidden />
+        <Check className="size-8" strokeWidth={3} aria-hidden />
       </motion.span>
     </div>
   );
 }
 
 /**
- * Rounded-rectangle outline that starts on the left edge where the rail line meets the card,
- * runs up and around clockwise, and closes back at that point.
+ * The two halves of a rounded-rectangle outline. Both start on the left edge where the rail line
+ * meets the card: one runs up over the top, the other down under the bottom, and they meet on the
+ * right edge at the same height. Each is drawn 0 to 1 over the same time, so the longer top half
+ * moves a little faster and they arrive together.
  */
-function outlinePath(w: number, h: number, r: number, startFromBottom: number, inset: number) {
+function outlineHalves(w: number, h: number, r: number, fromBottom: number, inset: number) {
   const L = inset;
   const T = inset;
   const R = w - inset;
   const B = h - inset;
-  const sy = B - startFromBottom;
-  return [
-    `M ${L} ${sy}`,
+  const y = B - fromBottom;
+  const top = [
+    `M ${L} ${y}`,
     `V ${T + r}`,
     `A ${r} ${r} 0 0 1 ${L + r} ${T}`,
     `H ${R - r}`,
     `A ${r} ${r} 0 0 1 ${R} ${T + r}`,
-    `V ${B - r}`,
-    `A ${r} ${r} 0 0 1 ${R - r} ${B}`,
-    `H ${L + r}`,
-    `A ${r} ${r} 0 0 1 ${L} ${B - r}`,
-    `V ${sy}`,
+    `V ${y}`,
   ].join(' ');
+  const bottom = [
+    `M ${L} ${y}`,
+    `V ${B - r}`,
+    `A ${r} ${r} 0 0 0 ${L + r} ${B}`,
+    `H ${R - r}`,
+    `A ${r} ${r} 0 0 0 ${R} ${B - r}`,
+    `V ${y}`,
+  ].join(' ');
+  return { top, bottom };
 }
 
 const STROKE = 4;
 
+/** Light-on-glass colours for the form inside the card (the app's tokens are for white panels). */
+const GLASS_TOKENS = {
+  '--color-ink': '#f3f5f9',
+  '--color-ink-2': '#c3cbd8',
+  '--color-ink-3': '#8592a8',
+  '--color-surface': 'rgb(255 255 255 / 0.06)',
+  '--color-sunken': 'rgb(255 255 255 / 0.03)',
+  '--color-line-strong': 'rgb(255 255 255 / 0.18)',
+  '--color-navy': '#3d63dd',
+  '--color-navy-3': '#5b7ff0',
+} as CSSProperties;
+
 /** White card whose outline fills during the border part of the timeline. */
 function ProgressCard({
   t,
+  border: range,
+  fromBottom,
   children,
   footer,
 }: {
   t: MotionValue<number>;
+  /** Part of the timeline the outline fills in. */
+  border: readonly [number, number];
+  /** Where the outline starts: height above the bottom edge, on the left side. */
+  fromBottom: number;
   children: ReactNode;
   footer: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const border = useSegment(t, SEG.border);
+  const border = useSegment(t, range);
   const visible = useTransform(border, (v) => (v > 0 ? 1 : 0));
   useEffect(() => {
     const el = ref.current;
@@ -431,33 +597,44 @@ function ProgressCard({
   }, []);
 
   const inset = STROKE / 2;
-  const d = size.w > 0 ? outlinePath(size.w, size.h, 28 - inset, DONE_CENTER, inset) : '';
+  const halves = size.w > 0 ? outlineHalves(size.w, size.h, 28 - inset, fromBottom, inset) : null;
 
   return (
     <div
       ref={ref}
-      className="relative flex flex-col lg:min-h-[540px] justify-between rounded-[28px] bg-white p-8 shadow-[0_40px_90px_-30px_rgb(0_0_0/0.6)] sm:p-10"
+      style={GLASS_TOKENS}
+      className="relative flex flex-col justify-between rounded-[28px] bg-[#0f1b2d]/35 px-7 pt-7 pb-8 text-ink shadow-[0_40px_90px_-30px_rgb(0_0_0/0.6)] backdrop-blur-xl sm:p-8 lg:min-h-[480px]"
     >
-      {d && (
+      {halves && (
         <svg
           aria-hidden
           className="pointer-events-none absolute inset-0 size-full overflow-visible"
           viewBox={`0 0 ${size.w} ${size.h}`}
         >
-          <path d={d} fill="none" stroke="#e7e4df" strokeWidth={STROKE - 1} />
-          <motion.path
-            d={d}
-            fill="none"
-            stroke={TONE.done}
-            strokeWidth={STROKE}
-            strokeLinecap="round"
-            style={{ pathLength: border, opacity: visible }}
-          />
+          {[halves.top, halves.bottom].map((d) => (
+            <path
+              key={`track${d}`}
+              d={d}
+              fill="none"
+              stroke="rgb(255 255 255 / 0.14)"
+              strokeWidth={STROKE - 1}
+            />
+          ))}
+          {[halves.top, halves.bottom].map((d) => (
+            <motion.path
+              key={d}
+              d={d}
+              fill="none"
+              stroke={TONE.done}
+              strokeWidth={STROKE}
+              strokeLinecap="round"
+              style={{ pathLength: border, opacity: visible }}
+            />
+          ))}
         </svg>
       )}
       <div>{children}</div>
-      {/* footer sits at the foot: its centre is DONE_CENTER above the bottom edge */}
-      <div className="mt-10">{footer}</div>
+      <div className="mt-8">{footer}</div>
     </div>
   );
 }
