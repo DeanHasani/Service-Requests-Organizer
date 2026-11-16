@@ -1,6 +1,6 @@
 # DESKFLOW
 
-An internal service request tracker for a small IT support team. Requests arrive by phone, email and chat; staff log them in DESKFLOW, give each one an owner, move it from **Open** to **In progress** to **Resolved**, and leave internal notes along the way. Every change is recorded in an activity history.
+An internal service request tracker for a small IT support team. Requests arrive by phone, email and chat; staff log them in DESKFLOW, give each one an owner, move it from Open to In progress to Resolved, and leave internal notes along the way. Every change goes into an activity history with a name and a time.
 
 ## The problem
 
@@ -9,7 +9,7 @@ Requests used to live in personal notes and spreadsheets. Some were forgotten, s
 ## Features
 
 - Sign-in with server-side sessions (no public sign-up; demo accounts are seeded)
-- Two roles: **Manager** (everything) and **Employee** (works on their own requests, can claim unassigned ones)
+- Two roles. Managers see and change everything and hand work out. Employees work on the requests assigned to them and can claim unassigned ones.
 - Dashboard with live counts, status split, your workload, recent requests and recent activity
 - Request list with search, filters, sortable columns and server-side pagination
 - Create requests with validation and duplicate-submission protection
@@ -17,7 +17,7 @@ Requests used to live in personal notes and spreadsheets. Some were forgotten, s
 - Internal notes and an automatic, attributed activity history
 - My requests, Unassigned queue (with one-click assign or claim) and Team workload page
 - Managers can add team members and deactivate or reactivate accounts
-- Concurrent edits are detected (a stale write is rejected, not silently applied)
+- Concurrent edits are caught: if someone saved a request after you opened it, your change is refused and the page loads the latest version
 - Works on phones, tablets (iPad portrait and landscape) and desktops; tables turn into cards on small screens
 
 ## Tech stack
@@ -77,7 +77,7 @@ Open http://localhost:5173 and sign in with a demo account.
 
 ## Demo accounts
 
-All use the password **`Deskflow!2026`** (the `SEED_PASSWORD` value).
+All four use the password `Deskflow!2026`, which comes from `SEED_PASSWORD`.
 
 | Name           | Email                 | Role     |
 | -------------- | --------------------- | -------- |
@@ -90,11 +90,11 @@ The seed adds 18 requests covering every status, priority and source, assigned a
 
 ## Demo walkthrough
 
-1. Sign in as **Growin Manager** (`growin@deskflow.test`). Click **New request**, fill it in, create it.
-2. On the request page, pick **Dean Hasani** in the Assignee field.
-3. Sign out (bottom of the sidebar). Sign in as **Dean** (`dean@deskflow.test`).
+1. Sign in as Growin Manager (`growin@deskflow.test`). Click **New request**, fill it in, create it.
+2. On the request page, pick Dean Hasani in the Assignee field.
+3. Sign out (bottom of the sidebar). Sign in as Dean (`dean@deskflow.test`).
 4. Open **My requests**, find the request, add a note, click **Start work**, then **Resolve**.
-5. Sign in as the manager again and open the request: resolution details, the note and the full activity history are there.
+5. Sign in as the manager again and open the request. It shows who resolved it and when, the note, and the full activity history.
 6. Stop the servers and run `npm run dev` again. Everything is still there.
 
 ## Scripts

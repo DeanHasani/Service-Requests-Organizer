@@ -2,7 +2,7 @@
 
 ## Summary
 
-DESKFLOW is a working full-stack service request tracker for a small internal IT support team. Staff register requests that came in by phone, email or message, give each one an owner, move it through Open, In progress and Resolved, and leave internal notes. Every change is recorded with who made it and when. All requirements in the brief are implemented. 115 automated tests pass, and lint, strict typecheck and formatting are clean.
+DESKFLOW is a full-stack service request tracker for a small internal IT support team. Staff register requests that came in by phone, email or message, give each one an owner, move it through Open, In progress and Resolved, and leave internal notes. Every change is recorded with who made it and when. All requirements in the brief are implemented. 115 automated tests pass, and lint, strict typecheck and formatting are clean.
 
 ## Completed features
 
@@ -26,13 +26,13 @@ A React single-page app talks to an Express REST API on the same origin. The API
 
 ## Main technical decisions
 
-- **SQLite + Prisma 6.** Real relational storage with migrations and nothing to install. Moving to Postgres is a provider change plus a migration.
-- **Own session table.** It stores only a SHA-256 of the cookie token, and deactivating a user revokes their sessions in the same transaction.
-- **Optimistic concurrency.** Each write carries the `version` it read. If someone else changed the request in between, the API returns 409 and the screen reloads instead of overwriting.
-- **Idempotent create.** A client-generated key makes double clicks, retries and duplicate tabs produce one request.
-- **Collision-free references.** `SR-000001` numbers come from a counter row incremented inside the create transaction.
-- **Atomic audit.** Every change and its activity entries are committed together.
-- **Brief gaps filled deliberately.** Managers hand out work but are never assignees themselves. Employees can claim unassigned work, change priority on their own requests and reopen them. Unassigning an in-progress request returns it to Open. All of these are listed in [docs/assumptions.md](docs/assumptions.md).
+- SQLite with Prisma 6 gives real relational storage and migrations with nothing extra to install. Moving to Postgres means changing the provider and running a migration.
+- Sessions live in their own table, which stores only a SHA-256 of the cookie token. Deactivating a user deletes their sessions in the same transaction.
+- Each write sends the `version` it read. If someone else changed the request in between, the API answers 409 and the screen reloads with the latest data.
+- The create form sends a key generated in the browser, so a double click, a retry or a second open tab still produces one request.
+- `SR-000001` style numbers come from a counter row that is incremented inside the create transaction, so two requests can never get the same number.
+- Every change is saved in the same transaction as its activity entries.
+- Where the brief left room, managers hand out work and are never assignees themselves. Employees can claim unassigned work, change priority on their own requests and reopen them. Unassigning a request that is in progress moves it back to Open. [docs/assumptions.md](docs/assumptions.md) lists each of these.
 
 ## Testing results
 
@@ -47,8 +47,9 @@ The end-to-end run covers the full ten-step journey from the brief, a permission
 
 ## Reviews carried out
 
-- **Security review.** It found no critical or high issues. It found one medium issue: the dummy password hash used a lower bcrypt cost than real hashes, so login response time could reveal which emails exist. That is fixed and tested. Three low issues are also fixed and tested: the redirect guard now rejects `/\host` paths, a non-ASCII CSRF header returns 403 instead of 500, and passwords are capped at bcrypt's 72-byte limit.
-- **UI review**, over two rounds of desktop (1440 px) and mobile (390 px) screenshots. The first round raised eight items, the second round marked six resolved, and the three remaining items were fixed afterwards. Those last three were checked by screenshot only. The items covered: title width in the requests table, the unassigned marker on the dashboard, tabular numerals, the mobile sign-in mark, workload bar scale and assignee label length.
+The security review found no critical or high issues. The one medium issue was that the dummy password hash used a lower bcrypt cost than real hashes, so login response time could reveal which emails have accounts. That is fixed and has a test. Three low issues are fixed and tested as well: the redirect guard rejects `/\host` paths, a non-ASCII CSRF header gets a 403 instead of a 500, and passwords are capped at bcrypt's 72-byte limit.
+
+The UI review went through two rounds of desktop (1440 px) and mobile (390 px) screenshots. The first round raised eight items and the second marked six of them resolved. The last three were fixed afterwards and checked by screenshot. They covered title width in the requests table, the unassigned marker on the dashboard, tabular numerals, the logo on the mobile sign-in page, the workload bar scale and the length of assignee labels.
 
 ## Known issues and limitations
 
@@ -58,11 +59,11 @@ The end-to-end run covers the full ten-step journey from the brief, a permission
 - The client bundle is about 670 kB before compression (one chunk). Route-level code splitting would reduce first load.
 - Demo credentials are documented in the README only, not shown in the app. A real deployment should change the seeded passwords.
 - Two places build the navy "New request" link by hand instead of using the shared button component; it looks the same but is duplicated styling.
-- Every signed-in user can read every request and the team list. This is intentional for a shared queue, but a stricter deployment might want it narrowed.
+- Every signed-in user can read every request and the team list. That fits a shared queue; a stricter setup could limit it.
 
 ## Unfinished functionality
 
-None of the required functionality is unfinished. Not built, because it is outside the brief: password reset, notifications, attachments, SLA timers, request deletion, editing or deleting notes, and integrations with email, phone or chat.
+Everything the brief requires is built. These were left out because the brief does not ask for them: password reset, notifications, attachments, SLA timers, request deletion, editing or deleting notes, and integrations with email, phone or chat.
 
 ## Future improvements
 
