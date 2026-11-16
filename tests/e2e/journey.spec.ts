@@ -26,7 +26,7 @@ test('manager creates and assigns, employee works and resolves, manager verifies
   page,
 }) => {
   // 1–2. Manager logs in and creates a request.
-  await signIn(page, 'growing@deskflow.test');
+  await signIn(page, 'growin@deskflow.test');
   await page.getByRole('link', { name: 'New request' }).first().click();
   await page.getByLabel('Title').fill(TITLE);
   await page.getByLabel('Requester name').fill('Marta Ruiz');
@@ -76,7 +76,7 @@ test('manager creates and assigns, employee works and resolves, manager verifies
   await signOut(page);
 
   // 9–10. Manager verifies the completed request and its history.
-  await signIn(page, 'growing@deskflow.test');
+  await signIn(page, 'growin@deskflow.test');
   await page.goto(requestUrl);
   await expect(page.getByRole('heading', { name: TITLE })).toBeVisible();
   await expect(page.getByText('Resolved by Dean Hasani')).toBeVisible();
@@ -122,7 +122,7 @@ test('data survives a server restart', async () => {
     expect(
       (
         await api.post('/api/auth/login', {
-          data: { email: 'growing@deskflow.test', password: PASSWORD },
+          data: { email: 'growin@deskflow.test', password: PASSWORD },
         })
       ).ok(),
     ).toBe(true);

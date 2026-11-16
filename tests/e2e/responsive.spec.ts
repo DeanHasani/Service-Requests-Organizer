@@ -18,7 +18,7 @@ for (const vp of viewports) {
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
     expect(await overflow(page)).toBe(0);
 
-    await page.getByLabel('Email').fill('growing@deskflow.test');
+    await page.getByLabel('Email').fill('growin@deskflow.test');
     await page.getByLabel('Password', { exact: true }).fill('Deskflow!2026');
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();

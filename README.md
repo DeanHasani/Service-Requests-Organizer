@@ -81,7 +81,7 @@ All use the password **`Deskflow!2026`** (the `SEED_PASSWORD` value).
 
 | Name           | Email                 | Role     |
 | -------------- | --------------------- | -------- |
-| Growin Manager | growing@deskflow.test | Manager  |
+| Growin Manager | growin@deskflow.test  | Manager  |
 | Dean Hasani    | dean@deskflow.test    | Employee |
 | Roman Max      | roman@deskflow.test   | Employee |
 | Roxanne Keys   | roxanne@deskflow.test | Employee |
@@ -90,7 +90,7 @@ The seed adds 18 requests covering every status, priority and source, assigned a
 
 ## Demo walkthrough
 
-1. Sign in as **Growin Manager** (`growing@deskflow.test`). Click **New request**, fill it in, create it.
+1. Sign in as **Growin Manager** (`growin@deskflow.test`). Click **New request**, fill it in, create it.
 2. On the request page, pick **Dean Hasani** in the Assignee field.
 3. Sign out (bottom of the sidebar). Sign in as **Dean** (`dean@deskflow.test`).
 4. Open **My requests**, find the request, add a note, click **Start work**, then **Resolve**.

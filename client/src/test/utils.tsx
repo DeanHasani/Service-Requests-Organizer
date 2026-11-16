@@ -17,7 +17,7 @@ export type Routes = Record<string, Handler | Reply>;
 export const manager: User = {
   id: 1,
   name: 'Growin Manager',
-  email: 'growing@deskflow.test',
+  email: 'growin@deskflow.test',
   role: 'MANAGER',
   isActive: true,
   createdAt: '2026-11-01T09:00:00.000Z',

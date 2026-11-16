@@ -83,4 +83,4 @@ npm run setup        # migrate + seed
 npm run dev          # http://localhost:5173
 ```
 
-Sign in as `growing@deskflow.test` (manager) or `dean@deskflow.test` (employee). The password for every demo account is `Deskflow!2026`. The step-by-step demo is in [README.md](README.md#demo-walkthrough).
+Sign in as `growin@deskflow.test` (manager) or `dean@deskflow.test` (employee). The password for every demo account is `Deskflow!2026`. The step-by-step demo is in [README.md](README.md#demo-walkthrough).

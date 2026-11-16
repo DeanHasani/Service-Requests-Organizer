@@ -20,7 +20,7 @@ if (!PASSWORD || PASSWORD.length < 8) {
 }
 
 const USERS = [
-  { key: 'manager', name: 'Growin Manager', email: 'growing@deskflow.test', role: 'MANAGER' },
+  { key: 'manager', name: 'Growin Manager', email: 'growin@deskflow.test', role: 'MANAGER' },
   { key: 'dean', name: 'Dean Hasani', email: 'dean@deskflow.test', role: 'EMPLOYEE' },
   { key: 'roman', name: 'Roman Max', email: 'roman@deskflow.test', role: 'EMPLOYEE' },
   { key: 'roxanne', name: 'Roxanne Keys', email: 'roxanne@deskflow.test', role: 'EMPLOYEE' },

@@ -24,7 +24,7 @@ describe('login', () => {
       },
     });
     renderApp('/login');
-    await userEvent.type(await screen.findByLabelText('Email'), 'growing@deskflow.test');
+    await userEvent.type(await screen.findByLabelText('Email'), 'growin@deskflow.test');
     await userEvent.type(screen.getByLabelText('Password'), 'wrong-password');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect email or password');
@@ -48,7 +48,7 @@ describe('login', () => {
       'GET /users': { body: { data: [] } },
     });
     renderApp('/login?next=%2Fteam');
-    await userEvent.type(await screen.findByLabelText('Email'), 'growing@deskflow.test');
+    await userEvent.type(await screen.findByLabelText('Email'), 'growin@deskflow.test');
     await userEvent.type(screen.getByLabelText('Password'), 'Deskflow!2026');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('heading', { name: 'Team' })).toBeInTheDocument();
