@@ -112,24 +112,26 @@ export function LifecycleRail({
   onDark = false,
 }: {
   status: Status;
-  size?: 'sm' | 'lg';
+  /** `xs` is the compact rail used in dense lists. */
+  size?: 'xs' | 'sm' | 'lg';
   onDark?: boolean;
 }) {
   const at = STATUSES.indexOf(status);
 
-  if (size === 'sm') {
+  if (size === 'sm' || size === 'xs') {
+    const xs = size === 'xs';
     return (
       <span aria-hidden className="inline-flex items-center">
         {STATUSES.map((s, i) => (
           <span key={s} className="inline-flex items-center">
             {i > 0 && (
               <span
-                className="h-[2px] w-2.5"
+                className={xs ? 'h-[1.5px] w-1.5' : 'h-[2px] w-2.5'}
                 style={{ background: i <= at ? stopTone[status] : 'var(--color-line-strong)' }}
               />
             )}
             <span
-              className="size-[7px] rounded-full"
+              className={cx('rounded-full', xs ? 'size-[5px]' : 'size-[7px]')}
               style={{
                 background: i <= at ? stopTone[status] : 'transparent',
                 boxShadow: i <= at ? 'none' : 'inset 0 0 0 1.5px var(--color-line-strong)',

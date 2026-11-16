@@ -138,7 +138,7 @@ export function LoginPage() {
         ].join(','),
       }}
     >
-      <div className="grid w-full max-w-6xl gap-10 lg:grid-cols-[minmax(0,1fr)_370px] lg:gap-0">
+      <div className="grid w-full max-w-6xl gap-10 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-0">
         {/* Left: brand, sentences, then the rail. Its line ends at the card's edge. */}
         <div className="flex flex-col justify-end">
           {/* Extra left padding centres the text over the In progress stop (56px right of centre). */}
@@ -169,7 +169,7 @@ export function LoginPage() {
         </div>
 
         {/* Right: the sign-in card. Its border is the last stretch; Done sits at its foot. */}
-        <main className="relative mx-auto w-full max-w-[310px] lg:max-w-[370px]">
+        <main className="relative mx-auto w-full max-w-[340px] lg:max-w-[420px]">
           <span
             aria-hidden
             className="pointer-events-none absolute -inset-14 -z-10 rounded-[48px] opacity-90 blur-3xl"
@@ -190,10 +190,14 @@ export function LoginPage() {
               )
             }
           >
-            <h1 className="text-2xl font-semibold tracking-[-0.02em]">Sign in</h1>
-            <p className="mt-1.5 text-sm text-ink-2">Use your work email and password.</p>
+            <h1 className="text-[28px] font-semibold tracking-[-0.02em]">Sign in</h1>
+            <p className="mt-2 text-[15px] text-ink-2">Use your work email and password.</p>
 
-            <form onSubmit={onSubmit} noValidate className="mt-7 flex flex-col gap-4">
+            <form
+              onSubmit={onSubmit}
+              noValidate
+              className="mt-8 flex flex-col gap-5 [&_label]:text-[15px]"
+            >
               {formError && (
                 <motion.div
                   initial={{ opacity: 0, transform: 'translateY(-4px)' }}
@@ -208,6 +212,7 @@ export function LoginPage() {
               <Field id="email" label="Email" error={errors.email?.message}>
                 <Input
                   id="email"
+                  className={FIELD}
                   type="email"
                   autoComplete="username"
                   autoFocus
@@ -222,7 +227,7 @@ export function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     aria-invalid={!!errors.password}
-                    className="pr-10"
+                    className={cx(FIELD, 'pr-11')}
                     {...register('password')}
                   />
                   <button
@@ -245,7 +250,7 @@ export function LoginPage() {
                 variant="primary"
                 loading={isSubmitting}
                 disabled={done}
-                className="mt-2 h-10"
+                className="mt-2 h-12! text-base!"
               >
                 {isSubmitting ? 'Signing in…' : 'Sign in'}
               </Button>
@@ -549,6 +554,9 @@ function outlineHalves(w: number, h: number, r: number, fromBottom: number, inse
 
 const STROKE = 4;
 
+/** Taller inputs with larger text on this page (`!` beats the shared control size). */
+const FIELD = 'h-12! text-base!';
+
 /** Light-on-glass colours for the form inside the card (the app's tokens are for white panels). */
 const GLASS_TOKENS = {
   '--color-ink': '#f3f5f9',
@@ -603,7 +611,7 @@ function ProgressCard({
     <div
       ref={ref}
       style={GLASS_TOKENS}
-      className="relative flex flex-col justify-between rounded-[28px] bg-[#0f1b2d]/35 px-7 pt-7 pb-8 text-ink shadow-[0_40px_90px_-30px_rgb(0_0_0/0.6)] backdrop-blur-xl sm:p-8 lg:min-h-[480px]"
+      className="relative flex flex-col justify-between rounded-[28px] bg-[#0f1b2d]/35 px-7 pt-7 pb-8 text-ink shadow-[0_40px_90px_-30px_rgb(0_0_0/0.6)] backdrop-blur-xl sm:p-8 lg:min-h-[540px]"
     >
       {halves && (
         <svg

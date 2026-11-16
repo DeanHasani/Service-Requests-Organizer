@@ -356,9 +356,7 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
-        <h1 className="text-[22px] leading-tight font-semibold tracking-[-0.015em] text-ink">
-          {title}
-        </h1>
+        <h1 className="text-[28px] leading-tight font-bold tracking-[-0.02em] text-ink">{title}</h1>
         {subtitle && <p className="mt-1 text-[13px] text-ink-2">{subtitle}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}

@@ -96,7 +96,7 @@ function UnassignedRow({ request: r }: { request: ServiceRequest }) {
     <div className="flex flex-col gap-3 bg-surface px-4 py-4 sm:flex-row sm:items-center sm:gap-6">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <RequestRef value={r.referenceNumber} />
+          <RequestRef value={r.referenceNumber} className="text-[11px]" />
           <PriorityBadge priority={r.priority} />
           <span className="text-xs text-ink-3">
             <SourceLabel source={r.source} />
@@ -111,7 +111,7 @@ function UnassignedRow({ request: r }: { request: ServiceRequest }) {
         </div>
         <Link
           to={`/requests/${r.id}`}
-          className="mt-1.5 block font-medium text-ink hover:underline"
+          className="mt-1.5 block text-[15px] font-medium text-ink hover:underline"
         >
           {r.title}
         </Link>

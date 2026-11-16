@@ -180,7 +180,9 @@ function MemberName({ member: u, isMe }: { member: TeamMember; isMe: boolean }) 
     <span className="flex min-w-0 items-center gap-3">
       <Avatar name={u.name} size="md" className={cx(!u.isActive && 'opacity-40 grayscale')} />
       <span className="min-w-0">
-        <span className={cx('block font-medium', u.isActive ? 'text-ink' : 'text-ink-3')}>
+        <span
+          className={cx('block text-[17px] font-semibold', u.isActive ? 'text-ink' : 'text-ink-3')}
+        >
           {u.name}
           {isMe && <span className="ml-1.5 font-normal text-ink-3">(you)</span>}
         </span>

@@ -296,13 +296,13 @@ const columns: {
   dates?: true;
   show?: string;
 }[] = [
-  { label: 'Reference', sort: 'referenceNumber', className: 'w-[9rem]' },
+  { label: 'Reference', sort: 'referenceNumber', className: 'w-[7.5rem]' },
   { label: 'Title', sort: 'title' },
   { label: 'Requester', className: 'w-[9rem]', show: 'hidden xl:table-cell' },
   { label: 'Source', className: 'w-[4rem]', show: 'hidden xl:table-cell' },
   { label: 'Priority', sort: 'priority', className: 'w-[6rem]' },
   { label: 'Status', className: 'w-[7.25rem]' },
-  { label: 'Assignee', className: 'w-[8.75rem]' },
+  { label: 'Assignee', className: 'w-[10rem]' },
   // Created and Updated share one stacked column so Title keeps the width.
   {
     label: 'Created / Updated',
@@ -431,15 +431,15 @@ function RequestTable({
             >
               <td className="py-3 pr-2.5 pl-4 whitespace-nowrap">
                 <span className="flex items-center gap-2.5">
-                  <LifecycleRail status={r.status} />
-                  <RequestRef value={r.referenceNumber} />
+                  <LifecycleRail status={r.status} size="xs" />
+                  <RequestRef value={r.referenceNumber} className="text-[11px]" />
                 </span>
               </td>
               <td className="px-2.5 py-3">
                 <Link
                   to={`/requests/${r.id}`}
                   title={r.title}
-                  className="block truncate font-medium text-ink decoration-ink-3/60 group-hover:underline"
+                  className="block truncate text-[15px] font-medium text-ink decoration-ink-3/60 group-hover:underline"
                 >
                   {r.title}
                 </Link>
@@ -463,7 +463,7 @@ function RequestTable({
                 {r.assignedTo ? (
                   <span className="flex min-w-0 items-center gap-2">
                     <Avatar name={r.assignedTo.name} size="xs" />
-                    <span className="truncate">{r.assignedTo.name}</span>
+                    <span className="truncate text-sm">{r.assignedTo.name}</span>
                   </span>
                 ) : (
                   <span className="text-ink-3">Unassigned</span>
@@ -496,12 +496,12 @@ function MobileList({ items }: { items: ServiceRequest[] }) {
           <Link to={`/requests/${r.id}`} className="block px-4 py-3 active:bg-canvas">
             <span className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2">
-                <LifecycleRail status={r.status} />
-                <RequestRef value={r.referenceNumber} />
+                <LifecycleRail status={r.status} size="xs" />
+                <RequestRef value={r.referenceNumber} className="text-[11px]" />
               </span>
               <PriorityBadge priority={r.priority} />
             </span>
-            <span className="mt-1.5 block font-medium text-ink">{r.title}</span>
+            <span className="mt-1.5 block text-[15px] font-medium text-ink">{r.title}</span>
             <span className="mt-1 flex items-center justify-between gap-3 text-xs text-ink-2">
               <span className="truncate">{r.requesterName}</span>
               <span className="shrink-0">{r.assignedTo?.name ?? 'Unassigned'}</span>
