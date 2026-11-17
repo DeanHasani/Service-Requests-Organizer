@@ -208,6 +208,13 @@ dialog.df-dialog[open]::backdrop {
   }
 }
 
+/* Nothing on the sign-in page keeps animating while the tab is in the background. */
+.page-hidden .intake-lane,
+.page-hidden .intake-icon,
+.page-hidden .animate-pulse {
+  animation-play-state: paused;
+}
+
 /* Dashboard stat cards: soft resting shadow, lifted on hover. */
 .ledger-cell {
   box-shadow:
