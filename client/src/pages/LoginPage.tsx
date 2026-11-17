@@ -162,9 +162,14 @@ export function LoginPage() {
             style={{ marginBottom: RAIL_Y - DOT / 2 }}
             aria-hidden
           >
-            <Stop t={t} at={0} label="Open" tone={TONE.open}>
-              <span className="size-4 rounded-full bg-white" />
-            </Stop>
+            <span className="relative">
+              {!reduce && <IntakeFlow />}
+              <span className="relative z-[1] block">
+                <Stop t={t} at={0} label="Open" tone={TONE.open}>
+                  <span className="size-4 rounded-full bg-white" />
+                </Stop>
+              </span>
+            </span>
             <Line t={t} range={SEG.line1} from={TONE.open} to={TONE.progress} />
             <Stop t={t} at={SEG.progress} label="In progress" tone={TONE.progress}>
               <ProgressIcon t={t} reduce={!!reduce} from={SEG.progress[0]} />
@@ -284,6 +289,90 @@ export function LoginPage() {
         © 2026 GROWIN AL
       </p>
     </div>
+  );
+}
+
+// ---------- intake flow: mail, chat and phone streaming into Open ----------
+
+const FLOW_ICONS = ['mail', 'chat', 'phone'] as const;
+
+/**
+ * Fixed "random" spread so the stream looks natural but renders the same every time. Each item:
+ * icon, starting height above or below the dot, size, travel time, start offset, sway, tilt.
+ */
+const FLOW_COUNT = 14;
+const FLOW = Array.from({ length: FLOW_COUNT }, (_, i) => {
+  const r = (n: number) => {
+    const x = Math.sin((i + 1) * 12.9898 * n) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  const dur = 4.4 + r(1) * 2;
+  // Heights are a shuffled even spread, so the stream fills the band instead of clumping.
+  const slot = (i * 5) % FLOW_COUNT;
+  return {
+    icon: FLOW_ICONS[i % 3]!,
+    y0: Math.round((slot / (FLOW_COUNT - 1) - 0.5) * 230 + (r(2) - 0.5) * 14),
+    size: Math.round(34 + r(3) * 28),
+    dur,
+    sway: Math.round((r(4) - 0.5) * 36),
+    tilt: Math.round((r(5) - 0.5) * 50),
+  };
+});
+
+/**
+ * Requests arriving by mail, chat and phone: icons drift in from the left edge of the screen,
+ * large and faint, and narrow like a river into the Open stop, shrinking as they reach it.
+ * The layer spans exactly from the screen edge to the dot's centre, measured on resize.
+ */
+function IntakeFlow() {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const anchor = ref.current?.parentElement;
+    if (!anchor) return;
+    const measure = () => setWidth(Math.max(0, anchor.getBoundingClientRect().left + DOT / 2));
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+  const count = Math.min(FLOW_COUNT, Math.max(7, Math.round(width / 34)));
+  return (
+    <span
+      ref={ref}
+      aria-hidden
+      className="pointer-events-none absolute top-1/2"
+      style={{ right: DOT / 2, width, height: 0 }}
+    >
+      {width > 0 &&
+        // Fewer icons on a short run so a narrow screen doesn't look crowded.
+        FLOW.slice(0, count).map((f, i) => (
+          <span
+            key={i}
+            className="intake-lane"
+            style={
+              {
+                '--dur': `${f.dur}s`,
+                // Evenly staggered over the icons shown; negative so it is already flowing.
+                '--delay': `${-(i / count) * f.dur}s`,
+              } as CSSProperties
+            }
+          >
+            <span
+              className="intake-icon"
+              style={
+                {
+                  '--y0': `${f.y0}px`,
+                  '--sway': `${f.sway}px`,
+                  '--tilt': `${f.tilt}deg`,
+                  '--size': `${f.size}px`,
+                  '--tone': TONE.open,
+                  '--icon': `url(/loginflow/${f.icon}.png)`,
+                } as CSSProperties
+              }
+            />
+          </span>
+        ))}
+    </span>
   );
 }
 

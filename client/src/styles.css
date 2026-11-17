@@ -155,6 +155,57 @@ dialog.df-dialog[open]::backdrop {
   display: none;
 }
 
+/* Sign-in page: mail, chat and phone icons streaming into the Open stop. Each lane spans from
+   the screen edge to the dot and slides across; the icon in it narrows toward the dot's line,
+   shrinks and fades as it arrives. */
+.intake-lane {
+  position: absolute;
+  inset: 0;
+  animation: intake-x var(--dur) linear var(--delay) infinite;
+}
+.intake-icon {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--size);
+  height: var(--size);
+  margin: calc(var(--size) / -2) calc(var(--size) / -2) 0 0;
+  background-color: var(--tone);
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+  opacity: 0;
+  animation: intake-y var(--dur) linear var(--delay) infinite;
+}
+@keyframes intake-x {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes intake-y {
+  0% {
+    transform: translateY(var(--y0)) scale(1) rotate(var(--tilt));
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.5;
+  }
+  45% {
+    transform: translateY(calc(var(--y0) * 0.55 + var(--sway))) scale(0.78)
+      rotate(calc(var(--tilt) * 0.5));
+  }
+  75% {
+    transform: translateY(calc(var(--y0) * 0.2 - var(--sway) * 0.4)) scale(0.5) rotate(0deg);
+    opacity: 0.75;
+  }
+  100% {
+    transform: translateY(0) scale(0.12) rotate(0deg);
+    opacity: 0;
+  }
+}
+
 /* Dashboard stat cards: soft resting shadow, lifted on hover. */
 .ledger-cell {
   box-shadow:
