@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import {
   PrismaClient,
   type ActionType,
+  type Category,
   type Priority,
   type Source,
   type Status,
@@ -26,6 +27,28 @@ const USERS = [
   { key: 'roxanne', name: 'Roxanne Keys', email: 'roxanne@deskflow.test', role: 'EMPLOYEE' },
 ] as const;
 type Key = (typeof USERS)[number]['key'];
+
+/** Categories for the hand-written demo requests (also backfilled on existing databases). */
+const CATEGORY_BY_TITLE: Record<string, Category> = {
+  'Printer on 2nd floor not connecting to network': 'NETWORK',
+  'Laptop running very slowly after update': 'SOFTWARE',
+  'Access setup for new hire: Jana Petrović': 'ACCESS',
+  'Adobe Acrobat licence renewal': 'SOFTWARE',
+  'Wi-Fi drops in meeting room B': 'NETWORK',
+  'Quarterly maintenance for server room AC': 'FACILITIES',
+  'Cannot access email on phone': 'ACCESS',
+  'Shared folder permissions for Finance archive': 'ACCESS',
+  'Projector in training room shows no signal': 'HARDWARE',
+  'Order replacement keyboard and mouse': 'HARDWARE',
+  'VPN disconnects when working from home': 'NETWORK',
+  'Update antivirus on reception PC': 'SOFTWARE',
+  'Monitor flickering at desk 14': 'HARDWARE',
+  'Restore deleted contract file': 'OTHER',
+  'Set up shared calendar for the support rota': 'SOFTWARE',
+  'Badge reader at side entrance not working': 'FACILITIES',
+  'Install accounting software update': 'SOFTWARE',
+  'Conference phone has echo': 'HARDWARE',
+};
 
 type Seed = {
   title: string;
@@ -324,6 +347,7 @@ async function main() {
           requesterName: s.requester[0],
           requesterContact: s.requester[1],
           source: s.source,
+          category: CATEGORY_BY_TITLE[s.title] ?? 'OTHER',
           priority: s.priority,
           priorityRank: RANK[s.priority],
           status: s.status,
@@ -431,9 +455,208 @@ async function main() {
     created++;
   }
 
+  // Databases seeded before categories existed: give the demo requests theirs.
+  for (const [title, category] of Object.entries(CATEGORY_BY_TITLE)) {
+    await prisma.request.updateMany({ where: { title, category: null }, data: { category } });
+  }
+
+  const history = await seedHistory(ids);
+
   console.log(
-    `Seed complete: ${USERS.length} users ensured, ${created} new requests (${REQUESTS.length - created} already present).`,
+    `Seed complete: ${USERS.length} users ensured, ${created} new requests (${REQUESTS.length - created} already present), ${history} history requests added.`,
   );
+}
+
+// ---------- resolved history, so analytics has a few months to show ----------
+
+const HISTORY_TITLES: Record<Category, string[]> = {
+  HARDWARE: [
+    'Docking station not charging laptop',
+    'Replace broken headset',
+    'Second monitor not detected',
+    'Printer jams on double-sided jobs',
+  ],
+  SOFTWARE: [
+    'Outlook keeps asking for password',
+    'Install design tools for new starter',
+    'Excel crashes when opening large file',
+    'Teams camera not working after update',
+  ],
+  NETWORK: [
+    'Slow connection on 3rd floor',
+    'Guest Wi-Fi password not working',
+    'Cannot reach shared drive from home',
+    'Network port dead at desk 31',
+  ],
+  ACCESS: [
+    'Reset password for warehouse account',
+    'Add user to Sales distribution list',
+    'Remove access for leaver',
+    'Grant read access to HR folder',
+  ],
+  FACILITIES: [
+    'Heating not working in meeting room A',
+    'Replace light in corridor',
+    'Fix lock on storage cupboard',
+    'Kitchen dishwasher leaking',
+  ],
+  OTHER: [
+    'Recover file from last week backup',
+    'Book equipment for town hall',
+    'Label cables in comms room',
+    'Archive old project mailboxes',
+  ],
+};
+/** Typical hours to resolve, so the categories differ the way they would in real life. */
+const TYPICAL_HOURS: Record<Category, number> = {
+  HARDWARE: 30,
+  SOFTWARE: 16,
+  NETWORK: 40,
+  ACCESS: 5,
+  FACILITIES: 72,
+  OTHER: 12,
+};
+const HISTORY_COUNT = 64;
+const HISTORY_CATEGORIES: Category[] = [
+  'SOFTWARE',
+  'HARDWARE',
+  'ACCESS',
+  'NETWORK',
+  'SOFTWARE',
+  'FACILITIES',
+  'HARDWARE',
+  'OTHER',
+  'ACCESS',
+  'SOFTWARE',
+];
+const PEOPLE: [string, string][] = [
+  ['Laura Bennett', 'laura.bennett@northwind.example'],
+  ['Marco Silva', 'ext. 214'],
+  ['Priya Nair', '+44 20 7946 0321'],
+  ['Tom Becker', 'tom.becker@northwind.example'],
+  ['Grace Kim', 'ext. 118'],
+];
+
+/**
+ * Resolved requests spread over the last four months, keyed like the main seed so re-running
+ * adds nothing twice. Older work took longer, so the trend shows the team getting faster, and
+ * about one in nine was reopened once before being resolved again.
+ */
+async function seedHistory(ids: Record<Key, { id: number; name: string }>) {
+  const workers: Key[] = ['dean', 'roman', 'roxanne'];
+  const priorities: Priority[] = ['NORMAL', 'HIGH', 'LOW', 'NORMAL', 'URGENT', 'NORMAL'];
+  const sources: Source[] = ['EMAIL', 'PHONE', 'MESSAGE', 'EMAIL', 'OTHER'];
+  let added = 0;
+  for (let k = 0; k < HISTORY_COUNT; k++) {
+    const clientRequestId = `00000000-0000-4000-9000-${String(k + 1).padStart(12, '0')}`;
+    if (await prisma.request.findUnique({ where: { clientRequestId }, select: { id: true } }))
+      continue;
+    const category = HISTORY_CATEGORIES[k % HISTORY_CATEGORIES.length]!;
+    const titles = HISTORY_TITLES[category];
+    const title = titles[Math.floor(k / HISTORY_CATEGORIES.length) % titles.length]!;
+    const daysAgo = 4 + ((k * 37) % 116);
+    const worker = ids[workers[k % workers.length]!];
+    const manager = ids.manager;
+    const creator = k % 3 === 0 ? worker : manager;
+    const priority = priorities[k % priorities.length]!;
+    const [requesterName, requesterContact] = PEOPLE[k % PEOPLE.length]!;
+    // Older requests were slower: up to about twice the typical time four months ago.
+    const pace = 0.6 + (daysAgo / 120) * 0.9 + ((k * 13) % 7) / 20;
+    const took = Math.max(0.5, TYPICAL_HOURS[category] * pace);
+    const reopened = k % 9 === 4;
+
+    const t0 = new Date(Date.now() - daysAgo * 24 * HOUR - ((k * 5) % 8) * HOUR);
+    const at = (h: number) => new Date(t0.getTime() + h * HOUR);
+    const firstFix = at(took);
+    const finalFix = reopened ? at(took + 20 + took * 0.5) : firstFix;
+
+    await prisma.$transaction(async (tx) => {
+      const counter = await tx.counter.upsert({
+        where: { name: 'request' },
+        create: { name: 'request', value: 1 },
+        update: { value: { increment: 1 } },
+      });
+      const req = await tx.request.create({
+        data: {
+          clientRequestId,
+          referenceNumber: formatReference(counter.value),
+          title,
+          description: `${title}. Logged from a ${sources[k % sources.length]!.toLowerCase()} request and handled by the support team.`,
+          requesterName,
+          requesterContact,
+          source: sources[k % sources.length]!,
+          category,
+          priority,
+          priorityRank: RANK[priority],
+          status: 'RESOLVED',
+          version: reopened ? 4 : 2,
+          assignedToId: worker.id,
+          createdById: creator.id,
+          resolvedById: worker.id,
+          resolvedAt: finalFix,
+          createdAt: t0,
+          updatedAt: finalFix,
+        },
+      });
+      const status = (from: Status, to: Status) => ({
+        fieldName: 'status',
+        oldValue: STATUS_LABEL[from],
+        newValue: STATUS_LABEL[to],
+      });
+      const log = [
+        {
+          actionType: 'CREATED' as const,
+          actorId: creator.id,
+          createdAt: t0,
+          description: `created ${req.referenceNumber}`,
+        },
+        {
+          actionType: 'ASSIGNED' as const,
+          actorId: manager.id,
+          createdAt: at(0.3),
+          fieldName: 'assignedTo',
+          oldValue: null,
+          newValue: worker.name,
+          description: `assigned the request to ${worker.name}`,
+        },
+        {
+          actionType: 'STATUS_CHANGED' as const,
+          actorId: worker.id,
+          createdAt: at(Math.min(1, took / 2)),
+          ...status('OPEN', 'IN_PROGRESS'),
+          description: `changed status to ${STATUS_LABEL.IN_PROGRESS}`,
+        },
+        {
+          actionType: 'RESOLVED' as const,
+          actorId: worker.id,
+          createdAt: firstFix,
+          ...status('IN_PROGRESS', 'RESOLVED'),
+          description: 'resolved the request',
+        },
+        ...(reopened
+          ? [
+              {
+                actionType: 'REOPENED' as const,
+                actorId: manager.id,
+                createdAt: at(took + 20),
+                ...status('RESOLVED', 'OPEN'),
+                description: `reopened the request (previously resolved by ${worker.name})`,
+              },
+              {
+                actionType: 'RESOLVED' as const,
+                actorId: worker.id,
+                createdAt: finalFix,
+                ...status('OPEN', 'RESOLVED'),
+                description: 'resolved the request',
+              },
+            ]
+          : []),
+      ];
+      await tx.activityLog.createMany({ data: log.map((l) => ({ ...l, requestId: req.id })) });
+    });
+    added++;
+  }
+  return added;
 }
 
 main()

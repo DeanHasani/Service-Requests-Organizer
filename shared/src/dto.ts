@@ -1,4 +1,4 @@
-import type { ActionType, Priority, Role, Source, Status } from './domain';
+import type { ActionType, Category, Priority, Role, Source, Status } from './domain';
 
 /** Dates travel as ISO strings. */
 type ISODate = string;
@@ -58,6 +58,8 @@ export type ServiceRequest = {
   requesterName: string;
   requesterContact: string;
   source: Source;
+  /** Null for requests logged before categories existed ("Uncategorised"). */
+  category: Category | null;
   priority: Priority;
   status: Status;
   version: number;
@@ -116,6 +118,51 @@ export type DashboardSummary = {
   scope: 'team' | 'visible';
   mine: { open: number; inProgress: number; resolved: number };
   byPriority: Record<Priority, number>;
+};
+
+/** The manager's analytics page. Counts are for the chosen window unless noted. */
+export type Analytics = {
+  range: { from: ISODate | null; to: ISODate };
+  summary: {
+    created: number;
+    resolved: number;
+    avgResolveHours: number | null;
+    /** Share of requests resolved in the window that were reopened at least once in it. */
+    reopenRate: number | null;
+    /** Right now, regardless of window. */
+    openNow: number;
+    overdueNow: number;
+  };
+  /** One row per category, `null` = Uncategorised, sorted by `created` then `unresolved`. */
+  byCategory: {
+    category: Category | null;
+    created: number;
+    /** Right now, regardless of window. */
+    unresolved: number;
+    resolved: number;
+    avgResolveHours: number | null;
+    medianResolveHours: number | null;
+  }[];
+  mostReopened: {
+    request: { id: number; referenceNumber: string; title: string; status: Status };
+    category: Category | null;
+    reopens: number;
+  }[];
+  workload: {
+    user: UserRef;
+    /** Right now. */
+    active: number;
+    overdue: number;
+    resolved: number;
+    avgResolveHours: number | null;
+  }[];
+  /** Weekly buckets, oldest first. */
+  trend: {
+    weekStart: ISODate;
+    created: number;
+    resolved: number;
+    avgResolveHours: number | null;
+  }[];
 };
 
 export type ApiError = {

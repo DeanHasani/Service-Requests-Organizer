@@ -17,6 +17,8 @@ import {
 import {
   PRIORITIES,
   PRIORITY_LABEL,
+  CATEGORIES,
+  CATEGORY_LABEL,
   SOURCES,
   SOURCE_LABEL,
   STATUSES,
@@ -41,7 +43,7 @@ import {
 } from '../components/request-bits';
 
 type Scope = 'all' | 'mine';
-const FILTER_KEYS = ['q', 'status', 'priority', 'source', 'assignee', 'due'] as const;
+const FILTER_KEYS = ['q', 'status', 'priority', 'source', 'category', 'assignee', 'due'] as const;
 
 function useDebounced<T>(value: T, ms = 300) {
   const [v, setV] = useState(value);
@@ -84,6 +86,7 @@ export function RequestsPage({ scope }: { scope: Scope }) {
     status: get('status') as ListRequestsQuery['status'],
     priority: get('priority') as ListRequestsQuery['priority'],
     source: get('source') as ListRequestsQuery['source'],
+    category: get('category') as ListRequestsQuery['category'],
     assignee: scope === 'mine' ? 'me' : (get('assignee') as ListRequestsQuery['assignee']),
     due: get('due') === 'overdue' ? 'overdue' : undefined,
     sort,
@@ -208,6 +211,19 @@ export function RequestsPage({ scope }: { scope: Scope }) {
             </Select>
           )}
           <Select
+            aria-label="Filter by category"
+            value={get('category') ?? ''}
+            onChange={(e) => update({ category: e.target.value })}
+            className="w-full sm:w-40"
+          >
+            <option value="">Category</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_LABEL[c]}
+              </option>
+            ))}
+          </Select>
+          <Select
             aria-label="Filter by deadline"
             value={get('due') ?? ''}
             onChange={(e) => update({ due: e.target.value })}
@@ -309,20 +325,22 @@ const columns: {
   dates?: true;
   show?: string;
 }[] = [
-  { label: 'Reference', sort: 'referenceNumber', className: 'w-[7.5rem]' },
+  // Title, deadline, status and assignee come first; the rest appear only on wide screens.
+  { label: 'Reference', sort: 'referenceNumber', className: 'w-[7rem]' },
   { label: 'Title', sort: 'title' },
-  { label: 'Requester', className: 'w-[9rem]', show: 'hidden xl:table-cell' },
-  { label: 'Source', className: 'w-[4rem]', show: 'hidden xl:table-cell' },
+  { label: 'Requester', className: 'w-[9rem]', show: 'hidden min-[1600px]:table-cell' },
+  { label: 'Source', className: 'w-[4rem]', show: 'hidden min-[1600px]:table-cell' },
   { label: 'Priority', sort: 'priority', className: 'w-[6rem]' },
   { label: 'Status', className: 'w-[7.25rem]' },
-  { label: 'Deadline', sort: 'dueAt', className: 'w-[8rem]', show: 'hidden lg:table-cell' },
+  // Below xl the deadline shows under the title instead.
+  { label: 'Deadline', sort: 'dueAt', className: 'w-[12rem]', show: 'hidden xl:table-cell' },
   { label: 'Assignee', className: 'w-[10rem]' },
   // Created and Updated share one stacked column so Title keeps the width.
   {
     label: 'Created / Updated',
     className: 'w-[9.5rem]',
     dates: true,
-    show: 'hidden min-[1400px]:table-cell',
+    show: 'hidden min-[1760px]:table-cell',
   },
 ];
 
@@ -457,14 +475,17 @@ function RequestTable({
                 >
                   {r.title}
                 </Link>
+                {r.dueAt && r.status !== 'RESOLVED' && (
+                  <DueBadge dueAt={r.dueAt} status={r.status} className="mt-1 xl:hidden" />
+                )}
               </td>
               <td
-                className="hidden truncate px-2.5 py-3 text-ink-2 xl:table-cell"
+                className="hidden truncate px-2.5 py-3 text-ink-2 min-[1600px]:table-cell"
                 title={r.requesterName}
               >
                 {r.requesterName}
               </td>
-              <td className="hidden px-2.5 py-3 xl:table-cell">
+              <td className="hidden px-2.5 py-3 min-[1600px]:table-cell">
                 <SourceLabel source={r.source} iconOnly />
               </td>
               <td className="px-2.5 py-3">
@@ -473,9 +494,9 @@ function RequestTable({
               <td className="px-2.5 py-3">
                 <StatusBadge status={r.status} />
               </td>
-              <td className="hidden px-2.5 py-3 lg:table-cell">
+              <td className="hidden overflow-hidden px-2.5 py-3 xl:table-cell">
                 {r.dueAt && r.status !== 'RESOLVED' ? (
-                  <DueBadge dueAt={r.dueAt} status={r.status} />
+                  <DueBadge dueAt={r.dueAt} status={r.status} className="max-w-full" />
                 ) : (
                   <span className="text-ink-3">–</span>
                 )}
@@ -490,7 +511,7 @@ function RequestTable({
                   <span className="text-ink-3">Unassigned</span>
                 )}
               </td>
-              <td className="tabular hidden px-2.5 py-2.5 leading-tight whitespace-nowrap min-[1400px]:table-cell">
+              <td className="tabular hidden px-2.5 py-2.5 leading-tight whitespace-nowrap min-[1760px]:table-cell">
                 <span className="block text-ink-2" title={`Created ${formatDateTime(r.createdAt)}`}>
                   {formatShortDate(r.createdAt)}
                 </span>
@@ -520,8 +541,8 @@ function MobileList({ items }: { items: ServiceRequest[] }) {
                 <LifecycleRail status={r.status} size="xs" />
                 <RequestRef value={r.referenceNumber} className="text-[11px]" />
               </span>
-              <span className="flex items-center gap-3">
-                <DueBadge dueAt={r.dueAt} status={r.status} />
+              <span className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                <DueBadge dueAt={r.dueAt} status={r.status} className="max-w-full" />
                 <PriorityBadge priority={r.priority} />
               </span>
             </span>

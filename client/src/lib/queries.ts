@@ -5,6 +5,8 @@ import type {
   AssignmentInput,
   CreateRequestInput,
   CreateUserInput,
+  Analytics,
+  AnalyticsRange,
   DashboardSummary,
   Insights,
   ListRequestsQuery,
@@ -65,6 +67,14 @@ export const useDashboard = () =>
 
 export const useTeam = () =>
   useQuery({ queryKey: keys.team, queryFn: () => api.get<TeamMember[]>('/users') });
+
+/** Team-wide numbers for the manager's analytics page. */
+export const useAnalytics = (range: AnalyticsRange) =>
+  useQuery({
+    queryKey: ['analytics', range] as const,
+    queryFn: () => api.get<Analytics>(`/analytics?range=${range}`),
+    placeholderData: keepPreviousData,
+  });
 
 /** Someone's work history: your own, or anyone's for a manager. */
 export const useInsights = (id: number) =>
@@ -142,16 +152,19 @@ export const useTriage = (r: ServiceRequest) =>
   useRequestWrite(
     async ({
       priority,
+      category,
       dueAt,
       assignedToId,
     }: {
       priority: ServiceRequest['priority'];
+      category: ServiceRequest['category'];
       dueAt: string | null;
       assignedToId: number;
     }) => {
       let version = r.version;
       const changes = {
         ...(priority !== r.priority && { priority }),
+        ...(category && category !== r.category && { category }),
         ...(dueAt !== r.dueAt && { dueAt }),
       };
       if (Object.keys(changes).length) {

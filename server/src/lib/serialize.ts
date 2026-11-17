@@ -57,6 +57,7 @@ export const toRequest = (r: RequestRow): ServiceRequest => ({
   requesterName: r.requesterName,
   requesterContact: r.requesterContact,
   source: r.source,
+  category: r.category,
   priority: r.priority,
   status: r.status,
   version: r.version,

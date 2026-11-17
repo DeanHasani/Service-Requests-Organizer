@@ -39,6 +39,7 @@ export const makeRequest = (over: Partial<ServiceRequest> = {}): ServiceRequest 
   requesterName: 'Laura Bennett',
   requesterContact: 'laura@example.com',
   source: 'PHONE',
+  category: 'HARDWARE',
   priority: 'HIGH',
   status: 'OPEN',
   version: 3,

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { AnimatePresence, motion } from 'motion/react';
 import {
+  ChartColumn,
   ClipboardCheck,
   Inbox,
   LayoutGrid,
@@ -110,6 +111,9 @@ function SidebarContent() {
           />
         )}
         <NavItem to="/team" icon={Users} label="Team" />
+        {user.role === 'MANAGER' && (
+          <NavItem to="/analytics" icon={ChartColumn} label="Analytics" />
+        )}
         <NavLink
           to="/requests/new"
           className="mt-5 flex h-9 items-center justify-center gap-2 rounded-md border border-white/12 text-[13px] font-medium text-white transition-[background-color,transform] duration-150 hover:bg-navy-2 active:scale-[0.97]"

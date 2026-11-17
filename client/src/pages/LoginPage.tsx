@@ -174,7 +174,7 @@ export function LoginPage() {
             <Stop t={t} at={SEG.progress} label="In progress" tone={TONE.progress}>
               <ProgressIcon t={t} reduce={!!reduce} from={SEG.progress[0]} />
             </Stop>
-            <Line t={t} range={SEG.line2} from={TONE.progress} to={TONE.done} />
+            <Line t={t} range={SEG.line2} from={TONE.progress} to={TONE.done} intoCard />
           </div>
         </div>
 
@@ -542,7 +542,7 @@ function Stop({
   // Open is lit from the start, so it pops when the timeline sets off instead.
   const pop = usePop(at === 0 ? t : lit, at === 0 ? 0.005 : 0.999);
   return (
-    <span className="relative shrink-0">
+    <span className="relative z-[1] shrink-0">
       <motion.span
         className={cx(
           'absolute bottom-full left-1/2 -translate-x-1/2 font-semibold whitespace-nowrap',
@@ -609,19 +609,25 @@ function Line({
   from,
   to,
   small = false,
+  intoCard = false,
 }: {
   t: MotionValue<number>;
   range: readonly [number, number];
   from: string;
   to: string;
   small?: boolean;
+  /** The last stretch: runs under the card's edge so it joins the border with no gap. */
+  intoCard?: boolean;
 }) {
   const filled = useSegment(t, range);
   return (
     <span
       className={cx(
-        'relative flex-1 overflow-hidden rounded-full bg-white/10',
-        small ? 'h-[3px] min-w-4' : 'h-1 min-w-12',
+        // Both ends tuck under the stops (which sit above it), so the line reads as one piece.
+        'relative z-0 flex-1 overflow-hidden bg-white/10',
+        small ? '-mx-2 h-[3px] min-w-4' : 'h-1 min-w-12',
+        !small && (intoCard ? '-ml-4 -mr-[3px] rounded-l-full' : '-mx-4 rounded-full'),
+        small && 'rounded-full',
       )}
     >
       <motion.span

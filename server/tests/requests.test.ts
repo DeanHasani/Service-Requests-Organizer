@@ -46,7 +46,7 @@ describe('request creation', () => {
     const res = await mia.post('/api/requests', { clientRequestId: crypto.randomUUID() });
     expect(res.status).toBe(400);
     expect(Object.keys(res.body.error.details).sort()).toEqual(
-      ['description', 'requesterContact', 'requesterName', 'source', 'title'].sort(),
+      ['category', 'description', 'requesterContact', 'requesterName', 'source', 'title'].sort(),
     );
   });
 

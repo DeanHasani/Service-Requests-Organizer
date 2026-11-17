@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { contactError, PRIORITIES, ROLES, SOURCES, STATUSES } from './domain';
+import { CATEGORIES, contactError, PRIORITIES, ROLES, SOURCES, STATUSES } from './domain';
 
 // Empty gets "is required"; too short gets its own message (pipe stops at the first failure).
 const text = (label: string, max: number, min = 1) =>
@@ -44,6 +44,7 @@ const requestFields = {
     if (problem) ctx.addIssue({ code: 'custom', message: problem });
   }),
   source: z.enum(SOURCES, { error: 'Choose a valid source' }),
+  category: z.enum(CATEGORIES, { error: 'Choose a category' }),
   priority: z.enum(PRIORITIES, { error: 'Choose a valid priority' }),
 };
 
@@ -69,6 +70,7 @@ export const updateRequestSchema = z
     requesterName: requestFields.requesterName.optional(),
     requesterContact: requestFields.requesterContact.optional(),
     source: requestFields.source.optional(),
+    category: requestFields.category.optional(),
     priority: requestFields.priority.optional(),
     dueAt: dueAt.optional(),
     escalateTo: z.enum(PRIORITIES, { error: 'Choose a valid priority' }).nullable().optional(),
@@ -108,6 +110,7 @@ export const listRequestsQuerySchema = z.object({
   assignee: z.union([z.literal('me'), z.literal('none'), id]).optional(),
   /** `overdue`: past the deadline and not resolved. */
   due: z.literal('overdue').optional(),
+  category: z.enum(CATEGORIES).optional(),
   sort: z.enum(SORT_FIELDS).default('createdAt'),
   order: z.enum(['asc', 'desc']).default('desc'),
   page: z.coerce.number().int().min(1).default(1),
@@ -115,6 +118,13 @@ export const listRequestsQuerySchema = z.object({
 });
 /** What a client may send: every field optional, server applies defaults. */
 export type ListRequestsQuery = Partial<z.output<typeof listRequestsQuerySchema>>;
+
+/** Analytics window: the last 30 or 90 days, or everything. */
+export const ANALYTICS_RANGES = ['30', '90', 'all'] as const;
+export const analyticsQuerySchema = z.object({
+  range: z.enum(ANALYTICS_RANGES).default('30'),
+});
+export type AnalyticsRange = (typeof ANALYTICS_RANGES)[number];
 
 export const activityQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),

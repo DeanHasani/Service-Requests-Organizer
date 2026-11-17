@@ -5,8 +5,10 @@ import {
   canChangeStatus,
   canEditDetails,
   formatReference,
+  CATEGORY_LABEL,
   ESCALATION_HOURS,
   PRIORITY_LABEL,
+  UNCATEGORISED,
   SOURCE_LABEL,
   STATUS_LABEL,
   type AssignmentInput,
@@ -119,7 +121,8 @@ export async function listRequests(
   query: z.output<typeof listRequestsQuerySchema>,
   user: AuthUser,
 ): Promise<Page<ServiceRequest>> {
-  const { q, status, priority, source, assignee, due, sort, order, page, pageSize } = query;
+  const { q, status, priority, source, category, assignee, due, sort, order, page, pageSize } =
+    query;
   const filters: Prisma.RequestWhereInput = {
     ...(status && { status }),
     ...(due === 'overdue' && {
@@ -128,6 +131,7 @@ export async function listRequests(
     }),
     ...(priority && { priority }),
     ...(source && { source }),
+    ...(category && { category }),
     ...(assignee !== undefined && {
       assignedToId: assignee === 'me' ? user.id : assignee === 'none' ? null : assignee,
     }),
@@ -273,6 +277,7 @@ const EDITABLE = [
   'requesterName',
   'requesterContact',
   'source',
+  'category',
   'priority',
 ] as const;
 const FIELD_LABEL: Record<(typeof EDITABLE)[number], string> = {
@@ -281,14 +286,19 @@ const FIELD_LABEL: Record<(typeof EDITABLE)[number], string> = {
   requesterName: 'requester name',
   requesterContact: 'requester contact',
   source: 'source',
+  category: 'category',
   priority: 'priority',
 };
-const display = (field: (typeof EDITABLE)[number], value: string) =>
-  field === 'priority'
-    ? PRIORITY_LABEL[value as Priority]
-    : field === 'source'
-      ? SOURCE_LABEL[value as keyof typeof SOURCE_LABEL]
-      : value;
+const display = (field: (typeof EDITABLE)[number], value: string | null) =>
+  value === null
+    ? UNCATEGORISED
+    : field === 'priority'
+      ? PRIORITY_LABEL[value as Priority]
+      : field === 'source'
+        ? SOURCE_LABEL[value as keyof typeof SOURCE_LABEL]
+        : field === 'category'
+          ? CATEGORY_LABEL[value as keyof typeof CATEGORY_LABEL]
+          : value;
 
 export async function updateRequest(id: number, input: UpdateRequestInput, user: AuthUser) {
   await prisma.$transaction(async (tx) => {
@@ -309,8 +319,8 @@ export async function updateRequest(id: number, input: UpdateRequestInput, user:
         oldValue: display(field, current[field]),
         newValue: display(field, next),
         description:
-          field === 'priority'
-            ? `changed priority from ${display(field, current[field])} to ${display(field, next)}`
+          field === 'priority' || field === 'category'
+            ? `changed ${field} from ${display(field, current[field])} to ${display(field, next)}`
             : `updated the ${FIELD_LABEL[field]}`,
       });
     }

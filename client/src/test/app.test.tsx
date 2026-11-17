@@ -185,6 +185,7 @@ describe('create request', () => {
     await userEvent.type(screen.getByLabelText('Contact information'), 'jonas@example.com');
     await userEvent.type(screen.getByLabelText('Description'), 'Drops every 30 minutes.');
     await userEvent.click(screen.getByLabelText('Email'));
+    await userEvent.selectOptions(screen.getByLabelText('Category'), 'NETWORK');
     await userEvent.click(screen.getByLabelText('Urgent'));
     await userEvent.click(screen.getByRole('button', { name: 'Create request' }));
 
@@ -193,6 +194,7 @@ describe('create request', () => {
     expect(post.body).toMatchObject({
       title: 'VPN drops',
       source: 'EMAIL',
+      category: 'NETWORK',
       priority: 'URGENT',
       assignedToId: null,
       requesterContact: 'jonas@example.com',

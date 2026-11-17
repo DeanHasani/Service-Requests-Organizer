@@ -262,13 +262,13 @@ export function DueBadge({
     <span
       title={`Deadline: ${formatDeadline(dueAt)}`}
       className={cx(
-        'inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap',
+        'inline-flex min-w-0 items-center gap-1 text-xs font-medium whitespace-nowrap',
         overdue ? 'text-urgent' : days <= 2 ? 'text-high' : 'text-ink-2',
         className,
       )}
     >
       <CalendarClock className="size-3.5 shrink-0" aria-hidden />
-      {label}
+      <span className="truncate">{label}</span>
     </span>
   );
 }

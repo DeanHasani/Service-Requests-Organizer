@@ -2,7 +2,16 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router';
 import { AnimatePresence, motion } from 'motion/react';
 import { CheckCircle2 } from 'lucide-react';
-import { PRIORITIES, PRIORITY_LABEL, type Priority, type ServiceRequest } from '@deskflow/shared';
+import {
+  CATEGORIES,
+  CATEGORY_LABEL,
+  PRIORITIES,
+  PRIORITY_LABEL,
+  UNCATEGORISED,
+  type Category,
+  type Priority,
+  type ServiceRequest,
+} from '@deskflow/shared';
 import { useCurrentUser } from '../lib/auth';
 import { useAssignees, useRequests, useTriage } from '../lib/queries';
 import { ErrorState } from '../components/errors';
@@ -89,6 +98,7 @@ function ReviewRow({ request: r }: { request: ServiceRequest }) {
   const assignees = useAssignees();
   const triage = useTriage(r);
   const [priority, setPriority] = useState<Priority>(r.priority);
+  const [category, setCategory] = useState<Category | ''>(r.category ?? '');
   const [due, setDue] = useState(deadlineOf(r.dueAt));
   const [assignee, setAssignee] = useState('');
 
@@ -129,11 +139,25 @@ function ReviewRow({ request: r }: { request: ServiceRequest }) {
           if (!assignee) return;
           triage.mutate({
             priority,
+            category: category || null,
             dueAt: deadlineToIso(due),
             assignedToId: Number(assignee),
           });
         }}
       >
+        <Select
+          aria-label={`Category for ${r.referenceNumber}`}
+          value={category}
+          onChange={(e) => setCategory(e.target.value as Category | '')}
+          className="sm:w-40"
+        >
+          {!r.category && <option value="">{UNCATEGORISED}</option>}
+          {CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {CATEGORY_LABEL[c]}
+            </option>
+          ))}
+        </Select>
         <Select
           aria-label={`Priority for ${r.referenceNumber}`}
           value={priority}

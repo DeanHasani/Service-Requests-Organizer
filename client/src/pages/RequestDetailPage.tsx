@@ -16,7 +16,10 @@ import {
   canEditDetails,
   canTransition,
   canWorkOn,
+  CATEGORIES,
+  CATEGORY_LABEL,
   ESCALATION_HOURS,
+  UNCATEGORISED,
   noteSchema,
   PRIORITIES,
   PRIORITY_LABEL,
@@ -332,6 +335,13 @@ function PropertiesPanel({ request: r, user }: { request: ServiceRequest; user: 
         <Row label="Source">
           <SourceLabel source={r.source} />
         </Row>
+        <Row label="Category">
+          {r.category ? (
+            CATEGORY_LABEL[r.category]
+          ) : (
+            <span className="text-ink-3">{UNCATEGORISED}</span>
+          )}
+        </Row>
         <Row label="Requester">{r.requesterName}</Row>
         <Row label="Contact">
           <span className="break-words">{r.requesterContact}</span>
@@ -552,6 +562,7 @@ type EditValues = {
   requesterName: string;
   requesterContact: string;
   source: ServiceRequest['source'];
+  category?: NonNullable<ServiceRequest['category']>;
   version: number;
 };
 
@@ -625,6 +636,7 @@ function EditForm({
       requesterName: r.requesterName,
       requesterContact: r.requesterContact,
       source: r.source,
+      category: r.category ?? undefined,
       version: r.version,
     },
   });
@@ -666,6 +678,20 @@ function EditForm({
             {SOURCES.map((s) => (
               <option key={s} value={s}>
                 {SOURCE_LABEL[s]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field id="edit-category" label="Category" error={errors.category?.message}>
+          <Select
+            id="edit-category"
+            aria-invalid={!!errors.category}
+            {...register('category', { setValueAs: (v) => (v === '' ? undefined : v) })}
+          >
+            <option value="">Choose a category…</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_LABEL[c]}
               </option>
             ))}
           </Select>

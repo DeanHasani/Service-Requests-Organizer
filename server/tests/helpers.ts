@@ -55,6 +55,7 @@ export const validRequest = (overrides: Record<string, unknown> = {}) => ({
   requesterName: 'Laura Bennett',
   requesterContact: 'laura@example.com',
   source: 'PHONE',
+  category: 'HARDWARE',
   priority: 'HIGH',
   clientRequestId: randomUUID(),
   ...overrides,

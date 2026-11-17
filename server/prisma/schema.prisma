@@ -25,6 +25,15 @@ enum Priority {
   URGENT
 }
 
+enum Category {
+  HARDWARE
+  SOFTWARE
+  NETWORK
+  ACCESS
+  FACILITIES
+  OTHER
+}
+
 enum Source {
   PHONE
   EMAIL
@@ -82,6 +91,8 @@ model Request {
   requesterName    String
   requesterContact String
   source           Source
+  /// What kind of issue it is. Null for requests logged before categories existed.
+  category         Category?
   priority         Priority  @default(NORMAL)
   /// LOW=0 … URGENT=3. Lets the list sort by urgency instead of alphabetically.
   priorityRank     Int       @default(1)
@@ -116,6 +127,7 @@ model Request {
   @@index([createdAt])
   @@index([updatedAt])
   @@index([dueAt])
+  @@index([category])
 }
 
 model RequestNote {

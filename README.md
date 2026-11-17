@@ -16,6 +16,8 @@ Requests used to live in personal notes and spreadsheets. Some were forgotten, s
 - Request page: edit details, assign and change priority with an explicit Save, start, resolve, reopen
 - Internal notes and an automatic, attributed activity history
 - My requests, a To review queue for managers (priority, deadline and owner in one step) and a Team page that shows employees who their manager is
+- Categories on every request (Hardware, Software, Network, Access & accounts, Facilities, Other), chosen when reporting and correctable by managers
+- Analytics for managers: requests and resolution time by category, weekly logged vs resolved and speed trend, most reopened requests, workload per employee
 - Deadlines with overdue highlighting, an overdue filter and deadline sorting
 - Profile with personal insights (active work, resolved per week and month, average time to resolve, recent activity); managers open any employee's
 - Managers add team members, deactivate or reactivate accounts and reset passwords with a one-time temporary password; everyone can change their password and sign out everywhere

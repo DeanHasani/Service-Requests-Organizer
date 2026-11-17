@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { rateLimit } from 'express-rate-limit';
 import {
   activityQuerySchema,
+  analyticsQuerySchema,
   assignmentSchema,
   canWorkOn,
   changePasswordSchema,
@@ -42,6 +43,7 @@ import {
 } from './lib/serialize';
 import * as requests from './services/requests';
 import * as users from './services/users';
+import { getAnalytics } from './services/analytics';
 
 // Compared against when the email is unknown, so response time does not reveal which emails exist.
 export const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', users.BCRYPT_ROUNDS);
@@ -214,6 +216,12 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
       take: limit,
     });
     res.json({ data: rows.map(toActivity) });
+  });
+
+  // ---------- analytics (managers) ----------
+  api.get('/analytics', requireRole('MANAGER'), async (req, res) => {
+    const { range } = parse(analyticsQuerySchema, req.query);
+    res.json({ data: await getAnalytics(range) });
   });
 
   // ---------- dashboard ----------

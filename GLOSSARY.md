@@ -14,6 +14,10 @@
 
 **Deadline**: when a manager expects a request resolved: a date, plus an optional time (no time means end of that day). Optional. Overdue means past it and not resolved. Requests show a live countdown to it.
 
+**Category**: what kind of issue a request is: Hardware, Software, Network, Access & accounts, Facilities or Other. Whoever reports it picks one; a manager can correct it. Requests from before categories existed show as Uncategorised.
+
+**Analytics**: the manager-only page with team-wide numbers for the last 30 or 90 days or all time: volume and speed by category, the weekly trend, reopened work and workload per employee.
+
 **Auto priority**: an optional rule a manager sets with a deadline: once the deadline is under 24 hours away, the priority rises to the level chosen (Normal, High or Urgent). It runs once, only raises, and is recorded in the history in the manager's name.
 
 **Temporary password**: a one-time password from a manager (on reset or for a new account). The holder must choose their own before using the app.

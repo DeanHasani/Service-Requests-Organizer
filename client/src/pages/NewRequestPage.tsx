@@ -6,6 +6,8 @@ import { Info, Mail, MessageSquare, MoreHorizontal, Phone } from 'lucide-react';
 import {
   createRequestSchema,
   PRIORITIES,
+  CATEGORIES,
+  CATEGORY_LABEL,
   ESCALATION_HOURS,
   PRIORITY_LABEL,
   type CreateRequestInput,
@@ -152,6 +154,25 @@ export function NewRequestPage() {
             registration={register('source')}
             error={errors.source?.message}
           />
+          <Field
+            id="category"
+            label="Category"
+            error={errors.category?.message}
+            hint={isEmployee ? 'Your best guess is fine; your manager can change it.' : undefined}
+          >
+            <Select
+              id="category"
+              aria-invalid={!!errors.category}
+              {...register('category', { setValueAs: (v) => (v === '' ? undefined : v) })}
+            >
+              <option value="">Choose a category…</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {CATEGORY_LABEL[c]}
+                </option>
+              ))}
+            </Select>
+          </Field>
           {isEmployee ? (
             <p className="flex gap-2.5 rounded-control bg-cobalt-soft px-3.5 py-3 text-sm text-ink">
               <Info className="mt-0.5 size-4 shrink-0 text-cobalt" aria-hidden />

@@ -10,6 +10,27 @@ export type Priority = (typeof PRIORITIES)[number];
 export const SOURCES = ['PHONE', 'EMAIL', 'MESSAGE', 'OTHER'] as const;
 export type Source = (typeof SOURCES)[number];
 
+/** What kind of issue a request is. A fixed list for now. */
+export const CATEGORIES = [
+  'HARDWARE',
+  'SOFTWARE',
+  'NETWORK',
+  'ACCESS',
+  'FACILITIES',
+  'OTHER',
+] as const;
+export type Category = (typeof CATEGORIES)[number];
+export const CATEGORY_LABEL: Record<Category, string> = {
+  HARDWARE: 'Hardware',
+  SOFTWARE: 'Software',
+  NETWORK: 'Network',
+  ACCESS: 'Access & accounts',
+  FACILITIES: 'Facilities',
+  OTHER: 'Other',
+};
+/** Shown for requests logged before categories existed. */
+export const UNCATEGORISED = 'Uncategorised';
+
 export const ACTION_TYPES = [
   'CREATED',
   'UPDATED',

@@ -36,6 +36,7 @@ test('manager creates and assigns, employee works and resolves, manager verifies
     .getByLabel('Description')
     .fill('Dell dock on desk 9 charges the laptop but neither monitor wakes up.');
   await page.getByRole('radio', { name: 'Phone' }).check({ force: true });
+  await page.getByLabel('Category').selectOption('HARDWARE');
   await page.getByText('High', { exact: true }).click();
   await page.getByRole('button', { name: 'Create request' }).click();
 

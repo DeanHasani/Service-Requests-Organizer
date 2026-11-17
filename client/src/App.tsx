@@ -16,6 +16,7 @@ import { RequestDetailPage } from './pages/RequestDetailPage';
 import { UnassignedPage } from './pages/UnassignedPage';
 import { TeamPage } from './pages/TeamPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
 import { MemberPage } from './pages/MemberPage';
 import { ChooseNewPasswordPage } from './pages/ChooseNewPasswordPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -79,6 +80,7 @@ export function AppRoutes() {
         <Route path="team" element={<TeamPage />} />
         <Route path="team/:id" element={<MemberPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
