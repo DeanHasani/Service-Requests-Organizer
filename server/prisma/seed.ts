@@ -309,6 +309,11 @@ async function main() {
           : assignee
             ? at(0.25)
             : t0;
+      // Managers set a deadline when they assign work: sooner for more urgent requests.
+      const dueAt =
+        assignee && !resolved
+          ? at(24 * { URGENT: 1, HIGH: 3, NORMAL: 7, LOW: 14 }[s.priority])
+          : null;
 
       const req = await tx.request.create({
         data: {
@@ -326,6 +331,7 @@ async function main() {
           createdById: creator.id,
           resolvedById: resolved ? resolver.id : null,
           resolvedAt: resolved ? at(5) : null,
+          dueAt,
           createdAt: t0,
           updatedAt: lastAt,
         },
@@ -348,15 +354,30 @@ async function main() {
         },
       ];
       if (assignee) {
-        const self = assignee.id === creator.id;
         log.push({
           actionType: 'ASSIGNED',
-          actorId: self ? assignee.id : ids.manager.id,
+          actorId: ids.manager.id,
           createdAt: at(0.25),
           fieldName: 'assignedTo',
           oldValue: null,
           newValue: assignee.name,
-          description: self ? 'claimed the request' : `assigned the request to ${assignee.name}`,
+          description: `assigned the request to ${assignee.name}`,
+        });
+      }
+      if (dueAt) {
+        const label = dueAt.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        });
+        log.push({
+          actionType: 'DEADLINE_CHANGED',
+          actorId: ids.manager.id,
+          createdAt: at(0.25),
+          fieldName: 'dueAt',
+          oldValue: null,
+          newValue: label,
+          description: `set the deadline to ${label}`,
         });
       }
       if ((s.status === 'IN_PROGRESS' || resolved) && assignee) {

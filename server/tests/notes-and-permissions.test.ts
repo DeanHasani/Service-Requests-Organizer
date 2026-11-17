@@ -26,7 +26,7 @@ describe('internal notes', () => {
       content: 'Called back, waiting on parts.',
       author: { id: users.ann.id, name: 'Ann Employee' },
     });
-    const list = await bob.get(`/api/requests/${r.id}/notes`);
+    const list = await mia.get(`/api/requests/${r.id}/notes`);
     expect(list.body.data).toHaveLength(1);
   });
 
@@ -55,8 +55,9 @@ describe('internal notes', () => {
 
   it('only lets employees add notes to their own requests', async () => {
     const r = await createRequest(mia, { assignedToId: users.ann.id });
+    // Bob cannot see Ann's open request at all.
     expect((await bob.post(`/api/requests/${r.id}/notes`, { content: 'mine now' })).status).toBe(
-      403,
+      404,
     );
     expect(
       (await mia.post(`/api/requests/${r.id}/notes`, { content: 'manager note' })).status,
@@ -79,13 +80,13 @@ describe('authorization', () => {
     expect((await ann.patch(`/api/users/${users.bob.id}`, { isActive: false })).status).toBe(403);
   });
 
-  it('blocks employees from assigning requests to anyone else', async () => {
-    const r = await createRequest(mia);
-    const res = await ann.patch(`/api/requests/${r.id}/assignment`, {
-      assignedToId: users.bob.id,
-      version: 0,
-    });
-    expect(res.status).toBe(403);
+  it('blocks employees from assigning requests, even ones they reported', async () => {
+    const r = await createRequest(ann, { priority: undefined });
+    for (const assignedToId of [users.bob.id, users.ann.id, null]) {
+      const res = await ann.patch(`/api/requests/${r.id}/assignment`, { assignedToId, version: 0 });
+      expect(res.status).toBe(403);
+      expect(res.body.error.message).toBe('Only managers assign requests');
+    }
   });
 
   it("blocks employees from taking or changing a colleague's request", async () => {
@@ -96,7 +97,8 @@ describe('authorization', () => {
       ann.patch(`/api/requests/${r.id}/assignment`, { assignedToId: users.ann.id, version: 0 }),
       ann.patch(`/api/requests/${r.id}/assignment`, { assignedToId: null, version: 0 }),
     ];
-    for (const res of await Promise.all(attempts)) expect(res.status).toBe(403);
+    // Someone else's open work is invisible to her, so every attempt reads as not found.
+    for (const res of await Promise.all(attempts)) expect(res.status).toBe(404);
     const after = (await mia.get(`/api/requests/${r.id}`)).body.data;
     expect(after).toMatchObject({
       title: 'Printer offline',
@@ -106,11 +108,15 @@ describe('authorization', () => {
     });
   });
 
-  it('blocks employees from editing unassigned requests', async () => {
-    const r = await createRequest(mia);
+  it('blocks employees from editing requests, including ones they reported', async () => {
+    const theirs = await createRequest(ann, { priority: undefined });
     expect(
-      (await ann.patch(`/api/requests/${r.id}`, { title: 'Longer title', version: 0 })).status,
+      (await ann.patch(`/api/requests/${theirs.id}`, { title: 'Longer title', version: 0 })).status,
     ).toBe(403);
+    const unseen = await createRequest(mia);
+    expect(
+      (await ann.patch(`/api/requests/${unseen.id}`, { title: 'Longer title', version: 0 })).status,
+    ).toBe(404);
   });
 
   it('lets employees work their own requests but leaves the details to the manager', async () => {

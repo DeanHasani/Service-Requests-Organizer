@@ -6,9 +6,11 @@ import type {
   CreateRequestInput,
   CreateUserInput,
   DashboardSummary,
+  Insights,
   ListRequestsQuery,
   Note,
   Page,
+  PasswordReset,
   ServiceRequest,
   StatusChangeInput,
   TeamMember,
@@ -25,6 +27,7 @@ export const keys = {
   feed: ['activity'] as const,
   dashboard: ['dashboard'] as const,
   team: ['team'] as const,
+  insights: (id: number) => ['team', 'insights', id] as const,
 };
 
 // ---------- reads ----------
@@ -63,9 +66,17 @@ export const useDashboard = () =>
 export const useTeam = () =>
   useQuery({ queryKey: keys.team, queryFn: () => api.get<TeamMember[]>('/users') });
 
-/** Active employees only, for assignee pickers (managers assign work, they don't take it). */
-export const useAssignees = () =>
+/** Someone's work history: your own, or anyone's for a manager. */
+export const useInsights = (id: number) =>
   useQuery({
+    queryKey: keys.insights(id),
+    queryFn: () => api.get<Insights>(`/users/${id}/insights`),
+  });
+
+/** Active employees only, for assignee pickers (managers assign work, they don't take it). */
+export const useAssignees = ({ enabled = true }: { enabled?: boolean } = {}) =>
+  useQuery({
+    enabled,
     queryKey: [...keys.team, 'active'],
     queryFn: () => api.get<TeamMember[]>('/users?active=true'),
     select: (users) => users.filter((u) => u.role === 'EMPLOYEE'),
@@ -123,6 +134,35 @@ export const useAssign = (id: number) =>
     api.patch<ServiceRequest>(`/requests/${id}/assignment`, input),
   );
 
+/**
+ * The manager's review step for a new request: set priority and deadline (when they changed),
+ * then assign. Each write carries the version the previous one returned.
+ */
+export const useTriage = (r: ServiceRequest) =>
+  useRequestWrite(
+    async ({
+      priority,
+      dueAt,
+      assignedToId,
+    }: {
+      priority: ServiceRequest['priority'];
+      dueAt: string | null;
+      assignedToId: number;
+    }) => {
+      let version = r.version;
+      const changes = {
+        ...(priority !== r.priority && { priority }),
+        ...(dueAt !== r.dueAt && { dueAt }),
+      };
+      if (Object.keys(changes).length) {
+        version = (await api.patch<ServiceRequest>(`/requests/${r.id}`, { ...changes, version }))
+          .version;
+      }
+      return api.patch<ServiceRequest>(`/requests/${r.id}/assignment`, { assignedToId, version });
+    },
+    { success: (res) => `${res.referenceNumber} assigned to ${res.assignedTo?.name}` },
+  );
+
 export function useAddNote(requestId: number) {
   const qc = useQueryClient();
   return useMutation({
@@ -140,6 +180,29 @@ export function useCreateUser() {
     onSuccess: (u) => {
       void qc.invalidateQueries({ queryKey: keys.team });
       toast.success(`${u.name} can now sign in`);
+    },
+  });
+}
+
+/** Issues a one-time password; the caller shows it to the manager exactly once. */
+export function useResetPassword() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.post<PasswordReset>(`/users/${id}/reset-password`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.team }),
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+/** Permanently closes a deactivated account. Their work keeps their name. */
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, confirmName }: { id: number; confirmName: string }) =>
+      api.delete<void>(`/users/${id}`, { confirmName }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.team });
+      void qc.invalidateQueries({ queryKey: keys.requests });
     },
   });
 }

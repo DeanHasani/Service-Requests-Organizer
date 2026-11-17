@@ -17,6 +17,7 @@ export async function resetDb() {
     prisma.requestNote.deleteMany(),
     prisma.request.deleteMany(),
     prisma.session.deleteMany(),
+    prisma.user.updateMany({ data: { deletedById: null } }),
     prisma.user.deleteMany(),
     prisma.counter.deleteMany(),
   ]);

@@ -42,17 +42,24 @@ enum ActionType {
   STATUS_CHANGED
   RESOLVED
   REOPENED
+  DEADLINE_CHANGED
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         Role     @default(EMPLOYEE)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                 Int       @id @default(autoincrement())
+  name               String
+  email              String    @unique
+  passwordHash       String
+  role               Role      @default(EMPLOYEE)
+  isActive           Boolean   @default(true)
+  /// Set when a manager resets the password; cleared once the user picks their own.
+  mustChangePassword Boolean   @default(false)
+  /// Set when a manager deletes the account: it can never sign in again and leaves the team
+  /// lists, but its name stays on the work it did. The email is freed for reuse.
+  deletedAt          DateTime?
+  deletedById        Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   assignedRequests Request[]     @relation("Assignee")
   createdRequests  Request[]     @relation("Creator")
@@ -60,30 +67,34 @@ model User {
   notes            RequestNote[]
   activities       ActivityLog[]
   sessions         Session[]
+  deletedBy        User?         @relation("DeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
+  deletedUsers     User[]        @relation("DeletedBy")
 }
 
 model Request {
-  id               Int      @id @default(autoincrement())
-  referenceNumber  String   @unique
+  id               Int       @id @default(autoincrement())
+  referenceNumber  String    @unique
   /// Idempotency key from the client; a retried create returns the existing row.
-  clientRequestId  String   @unique
+  clientRequestId  String    @unique
   title            String
   description      String
   requesterName    String
   requesterContact String
   source           Source
-  priority         Priority @default(NORMAL)
+  priority         Priority  @default(NORMAL)
   /// LOW=0 … URGENT=3. Lets the list sort by urgency instead of alphabetically.
-  priorityRank     Int      @default(1)
-  status           Status   @default(OPEN)
+  priorityRank     Int       @default(1)
+  status           Status    @default(OPEN)
   /// Optimistic concurrency token, bumped on every write.
-  version          Int      @default(0)
+  version          Int       @default(0)
   assignedToId     Int?
   createdById      Int
   resolvedById     Int?
   resolvedAt       DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  /// Deadline set by a manager.
+  dueAt            DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   assignedTo User?         @relation("Assignee", fields: [assignedToId], references: [id], onDelete: Restrict)
   createdBy  User          @relation("Creator", fields: [createdById], references: [id], onDelete: Restrict)
@@ -96,6 +107,7 @@ model Request {
   @@index([priorityRank])
   @@index([createdAt])
   @@index([updatedAt])
+  @@index([dueAt])
 }
 
 model RequestNote {

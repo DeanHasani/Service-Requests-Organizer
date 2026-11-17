@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle, Check, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import {
   animate,
+  AnimatePresence,
   motion,
   useMotionValue,
   useMotionValueEvent,
@@ -86,7 +87,13 @@ export function LoginPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const reduce = useReducedMotion();
+  // No scrollbar on the sign-in screen; it can still scroll on short screens.
+  useEffect(() => {
+    document.documentElement.classList.add('no-scrollbar');
+    return () => document.documentElement.classList.remove('no-scrollbar');
+  }, []);
   const [showPassword, setShowPassword] = useState(false);
+  const [forgot, setForgot] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   // While the finishing animation plays, stay on this page even though the user is signed in.
   const [finishing, setFinishing] = useState(false);
@@ -147,9 +154,7 @@ export function LoginPage() {
               DESKFLOW
             </span>
             <Logo className="mx-auto mt-5 block h-4 w-12 sm:h-5 sm:w-15" />
-            <h2 className="mx-auto mt-5 max-w-xl text-xl leading-tight font-semibold tracking-[-0.02em] text-balance text-white sm:text-[28px]">
-              Every request has an owner, a status and a history.
-            </h2>
+            <RollingTagline reduce={!!reduce} />
           </header>
 
           <div
@@ -245,6 +250,22 @@ export function LoginPage() {
                   </button>
                 </div>
               </Field>
+              <div className="-mt-1 text-[13px]">
+                <button
+                  type="button"
+                  onClick={() => setForgot((v) => !v)}
+                  aria-expanded={forgot}
+                  className="font-medium text-ink-2 underline-offset-2 hover:text-ink hover:underline"
+                >
+                  Forgot password?
+                </button>
+                {forgot && (
+                  <p className="mt-1.5 text-ink-2">
+                    Ask your manager to reset it. They’ll give you a temporary password, and you
+                    choose a new one when you sign in.
+                  </p>
+                )}
+              </div>
               <Button
                 type="submit"
                 variant="primary"
@@ -263,6 +284,78 @@ export function LoginPage() {
         © 2026 GROWIN AL
       </p>
     </div>
+  );
+}
+
+/** What DESKFLOW does, one line at a time. */
+const TAGLINES = [
+  'Every request has an owner, a status and a history.',
+  'Log every call, email and message in one queue.',
+  'Managers set the priority and deadline, then assign the work.',
+  'See what is open, what is late and who is on it.',
+];
+/** One line every 4.5 s: the wave takes about 1.5 s, leaving about 3 s to read the settled line. */
+const TAGLINE_MS = 4500;
+
+// The wave: word by word, first word first. Outgoing words leave quickly upward; incoming words
+// start a moment later, so the first new word rises into the space the first old one just left.
+const OUT_EASE = [0.55, 0, 0.75, 0.2] as const;
+const IN_EASE = [0.16, 1, 0.3, 1] as const;
+const wordMotion = {
+  initial: { y: '110%', opacity: 0 },
+  enter: (i: number) => ({
+    y: '0%',
+    opacity: 1,
+    transition: { delay: 0.32 + i * 0.06, duration: 0.75, ease: IN_EASE },
+  }),
+  exit: (i: number) => ({
+    y: '-110%',
+    opacity: 0,
+    transition: { delay: i * 0.04, duration: 0.45, ease: OUT_EASE },
+  }),
+};
+
+/**
+ * Rolls each line out word by word, like a wave, while the next rolls in the same way. Each word
+ * moves inside its own mask, so it rises out of and into the line rather than sliding across it.
+ * Stays on the first line with reduced motion.
+ */
+function RollingTagline({ reduce }: { reduce: boolean }) {
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    if (reduce) return;
+    const timer = setInterval(() => setIndex((i) => (i + 1) % TAGLINES.length), TAGLINE_MS);
+    return () => clearInterval(timer);
+  }, [reduce]);
+  return (
+    <h2 className="relative mx-auto mt-5 h-[52px] max-w-xl text-xl leading-tight font-semibold tracking-[-0.02em] text-white sm:h-[72px] sm:text-[28px]">
+      {/* Screen readers get the lines once, not a live region that keeps changing. */}
+      <span className="sr-only">{TAGLINES.join(' ')}</span>
+      <AnimatePresence initial={false}>
+        <motion.span
+          key={index}
+          aria-hidden
+          className="absolute inset-0 flex items-center justify-center text-balance"
+          initial="initial"
+          animate="enter"
+          exit="exit"
+        >
+          <span>
+            {TAGLINES[index]!.split(' ').map((word, i) => (
+              <span key={i}>
+                {i > 0 && ' '}
+                {/* The mask: tall enough for descenders, clips the word as it moves */}
+                <span className="inline-block overflow-hidden pb-[0.12em] align-bottom">
+                  <motion.span className="inline-block" custom={i} variants={wordMotion}>
+                    {word}
+                  </motion.span>
+                </span>
+              </span>
+            ))}
+          </span>
+        </motion.span>
+      </AnimatePresence>
+    </h2>
   );
 }
 

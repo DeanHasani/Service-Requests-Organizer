@@ -9,14 +9,16 @@ Requests used to live in personal notes and spreadsheets. Some were forgotten, s
 ## Features
 
 - Sign-in with server-side sessions (no public sign-up; demo accounts are seeded)
-- Two roles with separate duties. Managers create and edit requests, assign them and track progress (they can reopen resolved work). Employees start, note and resolve the requests assigned to them and can claim unassigned ones.
+- Two roles with separate duties. Managers review, prioritise, set deadlines, assign and track work (they can reopen resolved work). Employees report requests and start, note and resolve the ones assigned to them. Employees see their own work, what they reported, and everything resolved.
 - Dashboard with live counts, status split, your workload, recent requests and recent activity
 - Request list with search, filters, sortable columns and server-side pagination
 - Create requests with field checks (minimum lengths, a contact field with a phone, email or extension picker) and duplicate-submission protection
 - Request page: edit details, assign and change priority with an explicit Save, start, resolve, reopen
 - Internal notes and an automatic, attributed activity history
-- My requests, Unassigned queue (with one-click assign or claim) and Team workload page
-- Managers can add team members and deactivate or reactivate accounts
+- My requests, a To review queue for managers (priority, deadline and owner in one step) and a Team page that shows employees who their manager is
+- Deadlines with overdue highlighting, an overdue filter and deadline sorting
+- Profile with personal insights (active work, resolved per week and month, average time to resolve, recent activity); managers open any employee's
+- Managers add team members, deactivate or reactivate accounts and reset passwords with a one-time temporary password; everyone can change their password and sign out everywhere
 - Concurrent edits are caught: if someone saved a request after you opened it, your change is refused and the page loads the latest version
 - Clear error pages for each kind of failure, and loading skeletons shaped like each page
    (iPad portrait and landscape) and desktops; tables turn into cards on small screens
@@ -97,6 +99,16 @@ The seed adds 18 requests covering every status, priority and source, assigned a
 4. Open **My requests**, find the request, add a note, click **Start work**, then **Resolve**. (Only the assigned employee has these buttons.)
 5. Sign in as the manager again and open the request. It shows who resolved it and when, the note, and the full activity history.
 6. Stop the servers and run `npm run dev` again. Everything is still there.
+
+### Account recovery
+
+A manager resets a forgotten password from **Team**, then the person's page, then **Reset password**. If no manager can sign in, run this on the server:
+
+```bash
+npm run user:reset-password -- growin@deskflow.test
+```
+
+It prints a one-time password; the person chooses their own when they sign in.
 
 ## Scripts
 

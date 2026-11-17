@@ -147,6 +147,14 @@ dialog.df-dialog[open]::backdrop {
   }
 }
 
+/* Hides the page scrollbar (set on <html> by the sign-in page); scrolling still works. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Dashboard stat cards: soft resting shadow, lifted on hover. */
 .ledger-cell {
   box-shadow:

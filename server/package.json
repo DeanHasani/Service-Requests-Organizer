@@ -12,7 +12,8 @@
     "db:seed": "tsx --env-file-if-exists=.env prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
     "test": "vitest run",
-    "e2e:serve": "node tests/e2e-db.mjs && tsx src/index.ts"
+    "e2e:serve": "node tests/e2e-db.mjs && tsx src/index.ts",
+    "user:reset-password": "tsx --env-file-if-exists=.env scripts/reset-password.ts"
   },
   "prisma": {
     "seed": "tsx --env-file-if-exists=.env prisma/seed.ts"

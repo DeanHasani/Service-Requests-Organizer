@@ -20,6 +20,7 @@ export const manager: User = {
   email: 'growin@deskflow.test',
   role: 'MANAGER',
   isActive: true,
+  mustChangePassword: false,
   createdAt: '2026-11-01T09:00:00.000Z',
 };
 export const employee: User = {
@@ -45,6 +46,7 @@ export const makeRequest = (over: Partial<ServiceRequest> = {}): ServiceRequest 
   createdBy: { id: 1, name: 'Growin Manager' },
   resolvedBy: null,
   resolvedAt: null,
+  dueAt: null,
   createdAt: '2026-11-15T09:00:00.000Z',
   updatedAt: '2026-11-15T10:00:00.000Z',
   ...over,
@@ -95,6 +97,8 @@ function fallback(key: string): Reply {
           inProgress: 0,
           resolved: 0,
           unassigned: 0,
+          overdue: 0,
+          scope: 'team',
           mine: { open: 0, inProgress: 0, resolved: 0 },
           byPriority: { LOW: 0, NORMAL: 0, HIGH: 0, URGENT: 0 },
         },

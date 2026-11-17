@@ -19,7 +19,13 @@ const cookieOptions = (): CookieOptions => ({
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
 
 export type AuthUser = { id: number; name: string; email: string; role: Role };
-export type AuthContext = { user: AuthUser; sessionId: string; csrfToken: string };
+export type AuthContext = {
+  user: AuthUser;
+  sessionId: string;
+  csrfToken: string;
+  /** A manager reset the password; everything but choosing a new one is blocked. */
+  mustChangePassword: boolean;
+};
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -45,6 +51,13 @@ export async function endSession(res: Response, sessionId?: string) {
   res.clearCookie(COOKIE, { ...cookieOptions(), maxAge: undefined });
 }
 
+/** Signs a user out everywhere, optionally keeping one session (the one making the call). */
+export async function endAllSessions(userId: number, keepSessionId?: string) {
+  await prisma.session.deleteMany({
+    where: { userId, ...(keepSessionId && { id: { not: keepSessionId } }) },
+  });
+}
+
 const unauthenticated = (code = 'UNAUTHENTICATED', message = 'Please sign in to continue') =>
   new AppError(401, code, message);
 
@@ -57,7 +70,16 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
   const session = await prisma.session.findUnique({
     where: { id },
     include: {
-      user: { select: { id: true, name: true, email: true, role: true, isActive: true } },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          mustChangePassword: true,
+        },
+      },
     },
   });
   if (!session) {
@@ -74,8 +96,8 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
     await prisma.session.update({ where: { id }, data: { expiresAt: new Date(now + ttlMs()) } });
     res.cookie(COOKIE, token, cookieOptions());
   }
-  const { isActive: _ignored, ...user } = session.user;
-  req.auth = { user, sessionId: id, csrfToken: session.csrfToken };
+  const { isActive: _ignored, mustChangePassword, ...user } = session.user;
+  req.auth = { user, sessionId: id, csrfToken: session.csrfToken, mustChangePassword };
   next();
 };
 
@@ -100,9 +122,21 @@ export const requireCsrf: RequestHandler = (req, _res, next) => {
 export const requireRole =
   (role: Role): RequestHandler =>
   (req, _res, next) => {
-    if (req.auth?.user.role !== role) throw forbidden('Only managers can do that');
+    if (req.auth?.user.role !== role)
+      throw forbidden(`Only ${role === 'MANAGER' ? 'managers' : 'employees'} can do that`);
     next();
   };
+
+/** Calls still allowed while the user has to replace a temporary password. */
+const ALLOWED_BEFORE_PASSWORD_CHANGE = ['/auth/me', '/auth/password', '/auth/logout'];
+
+/** Blocks everything else until a user with a temporary password has chosen their own. */
+export const requirePasswordChosen: RequestHandler = (req, _res, next) => {
+  if (req.auth?.mustChangePassword && !ALLOWED_BEFORE_PASSWORD_CHANGE.includes(req.path)) {
+    throw new AppError(403, 'PASSWORD_CHANGE_REQUIRED', 'Choose a new password before continuing');
+  }
+  next();
+};
 
 /** Narrowing helper for handlers mounted behind requireAuth. */
 export function authOf(req: Request): AuthContext {

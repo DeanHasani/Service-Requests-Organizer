@@ -89,7 +89,7 @@ describe('status lifecycle (the assignee does the work)', () => {
   });
 
   it('rejects starting work on a request nobody owns', async () => {
-    const r = await createRequest(mia);
+    const r = await createRequest(ann, { priority: undefined });
     expect((await setStatus(ann, r.id, 'IN_PROGRESS', 0)).status).toBe(403);
     expect((await setStatus(mia, r.id, 'IN_PROGRESS', 0)).status).toBe(403);
     expect((await mia.get(`/api/requests/${r.id}`)).body.data.status).toBe('OPEN');
@@ -97,7 +97,8 @@ describe('status lifecycle (the assignee does the work)', () => {
 
   it("does not let an employee change a colleague's request", async () => {
     const { id } = await assignedToAnn();
-    expect((await setStatus(bob, id, 'IN_PROGRESS', 0)).status).toBe(403);
+    // Bob cannot even see it.
+    expect((await setStatus(bob, id, 'IN_PROGRESS', 0)).status).toBe(404);
   });
 
   it.each([

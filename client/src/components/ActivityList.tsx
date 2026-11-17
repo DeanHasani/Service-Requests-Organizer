@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowRightLeft,
+  CalendarClock,
   CheckCircle2,
   CirclePlus,
   Flag,
@@ -24,6 +25,7 @@ const icon: Record<ActionType, { Icon: typeof CirclePlus; tone: string }> = {
   STATUS_CHANGED: { Icon: PlayCircle, tone: 'text-progress bg-progress-soft' },
   RESOLVED: { Icon: CheckCircle2, tone: 'text-resolved bg-resolved-soft' },
   REOPENED: { Icon: RotateCcw, tone: 'text-open bg-open-soft' },
+  DEADLINE_CHANGED: { Icon: CalendarClock, tone: 'text-progress bg-progress-soft' },
 };
 
 const refLink = (a: Activity) => (

@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
-import type { Activity, Note, ServiceRequest, User } from '@deskflow/shared';
+import type { Activity, Note, ServiceRequest, TeamMember, User } from '@deskflow/shared';
+import type { AuthUser } from '../auth';
 
 const ref = { select: { id: true, name: true } } as const;
 
@@ -9,6 +10,7 @@ export const userSelect = {
   email: true,
   role: true,
   isActive: true,
+  mustChangePassword: true,
   createdAt: true,
 } satisfies Prisma.UserSelect;
 
@@ -32,6 +34,21 @@ type ActivityRow = Prisma.ActivityLogGetPayload<{ include: typeof activityInclud
 
 export const toUser = (u: UserRow): User => ({ ...u, createdAt: u.createdAt.toISOString() });
 
+/** Managers see everything about a person; employees only see a colleague's name and workload. */
+export const toTeamMember = (
+  u: UserRow,
+  counts: { activeCount: number; resolvedCount: number },
+  viewer: AuthUser,
+): TeamMember => {
+  const full = viewer.role === 'MANAGER' || viewer.id === u.id;
+  return {
+    ...toUser(u),
+    email: full ? u.email : null,
+    mustChangePassword: full ? u.mustChangePassword : null,
+    ...counts,
+  };
+};
+
 export const toRequest = (r: RequestRow): ServiceRequest => ({
   id: r.id,
   referenceNumber: r.referenceNumber,
@@ -47,6 +64,7 @@ export const toRequest = (r: RequestRow): ServiceRequest => ({
   createdBy: r.createdBy,
   resolvedBy: r.resolvedBy,
   resolvedAt: r.resolvedAt?.toISOString() ?? null,
+  dueAt: r.dueAt?.toISOString() ?? null,
   createdAt: r.createdAt.toISOString(),
   updatedAt: r.updatedAt.toISOString(),
 });

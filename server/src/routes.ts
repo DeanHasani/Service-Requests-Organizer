@@ -1,12 +1,15 @@
 import { Router } from 'express';
+import type { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { rateLimit } from 'express-rate-limit';
 import {
   activityQuerySchema,
   assignmentSchema,
   canWorkOn,
+  changePasswordSchema,
   createRequestSchema,
   createUserSchema,
+  deleteUserSchema,
   idParamSchema,
   listRequestsQuerySchema,
   loginSchema,
@@ -17,9 +20,18 @@ import {
   type DashboardSummary,
   type Priority,
 } from '@deskflow/shared';
-import { authOf, endSession, requireAuth, requireCsrf, requireRole, startSession } from './auth';
+import {
+  authOf,
+  endAllSessions,
+  endSession,
+  requireAuth,
+  requireCsrf,
+  requirePasswordChosen,
+  requireRole,
+  startSession,
+} from './auth';
 import { prisma } from './db';
-import { AppError, forbidden, notFound, parse } from './lib/errors';
+import { AppError, forbidden, parse } from './lib/errors';
 import {
   activityInclude,
   noteInclude,
@@ -39,20 +51,20 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
   const idOf = (params: unknown) => parse(idParamSchema, params).id;
 
   // ---------- auth ----------
-  const loginLimiter = rateLimit({
-    windowMs: 15 * 60_000,
-    limit: loginLimit,
-    skipSuccessfulRequests: true,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-    handler: (_req, res) =>
-      res.status(429).json({
-        error: {
-          code: 'RATE_LIMITED',
-          message: 'Too many sign-in attempts. Try again in 15 minutes.',
-        },
-      }),
-  });
+  // Failed attempts only. Also guards "current password" checks against guessing.
+  const failureLimiter = (message: string) =>
+    rateLimit({
+      windowMs: 15 * 60_000,
+      limit: loginLimit,
+      skipSuccessfulRequests: true,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      handler: (_req, res) => res.status(429).json({ error: { code: 'RATE_LIMITED', message } }),
+    });
+  const loginLimiter = failureLimiter('Too many sign-in attempts. Try again in 15 minutes.');
+  const passwordLimiter = failureLimiter(
+    'Too many incorrect password attempts. Try again in 15 minutes.',
+  );
 
   api.post('/auth/login', loginLimiter, async (req, res) => {
     const { email, password } = parse(loginSchema, req.body);
@@ -70,11 +82,26 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
     res.json({ data: { user: toUser(safe), csrfToken } });
   });
 
-  api.use(requireAuth, requireCsrf);
+  api.use(requireAuth, requireCsrf, requirePasswordChosen);
 
   api.post('/auth/logout', async (req, res) => {
     await endSession(res, authOf(req).sessionId);
     res.status(204).end();
+  });
+
+  /** Ends every session of the caller, on every device, including this one. */
+  api.post('/auth/logout-all', async (req, res) => {
+    const { user } = authOf(req);
+    await endAllSessions(user.id);
+    await endSession(res);
+    res.status(204).end();
+  });
+
+  /** Change your own password. Other sessions are signed out; this one stays. */
+  api.post('/auth/password', passwordLimiter, async (req, res) => {
+    const { user, sessionId, csrfToken } = authOf(req);
+    const input = parse(changePasswordSchema, req.body);
+    res.json({ data: { user: await users.changePassword(user, sessionId, input), csrfToken } });
   });
 
   api.get('/auth/me', async (req, res) => {
@@ -85,13 +112,28 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
 
   // ---------- users ----------
   api.get('/users', async (req, res) => {
-    res.json({ data: await users.listTeam(req.query.active === 'true') });
+    res.json({ data: await users.listTeam(authOf(req).user, req.query.active === 'true') });
   });
   api.get('/users/:id', async (req, res) => {
-    res.json({ data: await users.getTeamMember(idOf(req.params)) });
+    res.json({ data: await users.getTeamMember(idOf(req.params), authOf(req).user) });
+  });
+  /** A person's work history: their own, or anyone's for a manager. */
+  api.get('/users/:id/insights', async (req, res) => {
+    res.json({ data: await users.getInsights(idOf(req.params), authOf(req).user) });
   });
   api.post('/users', requireRole('MANAGER'), async (req, res) => {
-    res.status(201).json({ data: await users.createUser(parse(createUserSchema, req.body)) });
+    const input = parse(createUserSchema, req.body);
+    res.status(201).json({ data: await users.createUser(input, authOf(req).user) });
+  });
+  /** Permanently closes a deactivated account; its work history keeps the person's name. */
+  api.delete('/users/:id', requireRole('MANAGER'), async (req, res) => {
+    const { confirmName } = parse(deleteUserSchema, req.body);
+    await users.deleteUser(idOf(req.params), confirmName, authOf(req).user);
+    res.status(204).end();
+  });
+  /** Issues a one-time temporary password; the response is the only place it ever appears. */
+  api.post('/users/:id/reset-password', requireRole('MANAGER'), async (req, res) => {
+    res.json({ data: await users.resetPassword(idOf(req.params), authOf(req).user) });
   });
   api.patch('/users/:id', requireRole('MANAGER'), async (req, res) => {
     const { isActive } = parse(updateUserSchema, req.body);
@@ -115,7 +157,7 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
     res.status(created ? 201 : 200).json({ data: request });
   });
   api.get('/requests/:id', async (req, res) => {
-    res.json({ data: await requests.getRequest(idOf(req.params)) });
+    res.json({ data: await requests.getRequest(idOf(req.params), authOf(req).user) });
   });
   api.patch('/requests/:id', async (req, res) => {
     const input = parse(updateRequestSchema, req.body);
@@ -131,16 +173,8 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
   });
 
   // ---------- notes ----------
-  const requireRequest = async (id: number) => {
-    const row = await prisma.request.findUnique({
-      where: { id },
-      select: { id: true, assignedToId: true },
-    });
-    if (!row) throw notFound('Request');
-    return row;
-  };
   api.get('/requests/:id/notes', async (req, res) => {
-    const { id } = await requireRequest(idOf(req.params));
+    const { id } = await requests.requireVisible(idOf(req.params), authOf(req).user);
     const rows = await prisma.requestNote.findMany({
       where: { requestId: id },
       include: noteInclude,
@@ -149,8 +183,8 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
     res.json({ data: rows.map(toNote) });
   });
   api.post('/requests/:id/notes', async (req, res) => {
-    const request = await requireRequest(idOf(req.params));
     const { user } = authOf(req);
+    const request = await requests.requireVisible(idOf(req.params), user);
     if (!canWorkOn(user, request))
       throw forbidden('You can only add notes to requests assigned to you');
     const { content } = parse(noteSchema, req.body);
@@ -163,7 +197,7 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
 
   // ---------- activity ----------
   api.get('/requests/:id/activity', async (req, res) => {
-    const { id } = await requireRequest(idOf(req.params));
+    const { id } = await requests.requireVisible(idOf(req.params), authOf(req).user);
     const rows = await prisma.activityLog.findMany({
       where: { requestId: id },
       include: activityInclude,
@@ -174,6 +208,7 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
   api.get('/activity', async (req, res) => {
     const { limit } = parse(activityQuerySchema, req.query);
     const rows = await prisma.activityLog.findMany({
+      where: { request: requests.visibleWhere(authOf(req).user) },
       include: activityInclude,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit,
@@ -182,20 +217,29 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
   });
 
   // ---------- dashboard ----------
+  // Every number is counted over what the caller can see, so each card matches the list it opens.
   api.get('/dashboard', async (req, res) => {
-    const me = authOf(req).user.id;
-    const [byStatus, mine, unassigned, byPriority] = await Promise.all([
-      prisma.request.groupBy({ by: ['status'], _count: { _all: true } }),
+    const { user } = authOf(req);
+    const me = user.id;
+    const visible = requests.visibleWhere(user);
+    const within = (where: Prisma.RequestWhereInput) => ({ AND: [visible, where] });
+    const [byStatus, mine, unassigned, byPriority, overdue] = await Promise.all([
+      prisma.request.groupBy({ by: ['status'], where: visible, _count: { _all: true } }),
       prisma.request.groupBy({
         by: ['status'],
         where: { assignedToId: me },
         _count: { _all: true },
       }),
-      prisma.request.count({ where: { assignedToId: null, status: { not: 'RESOLVED' } } }),
+      prisma.request.count({
+        where: within({ assignedToId: null, status: { not: 'RESOLVED' } }),
+      }),
       prisma.request.groupBy({
         by: ['priority'],
-        where: { status: { not: 'RESOLVED' } },
+        where: within({ status: { not: 'RESOLVED' } }),
         _count: { _all: true },
+      }),
+      prisma.request.count({
+        where: within({ status: { not: 'RESOLVED' }, dueAt: { lt: new Date() } }),
       }),
     ]);
     const count = (groups: { status: string; _count: { _all: number } }[], s: string) =>
@@ -206,6 +250,8 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
       inProgress: count(byStatus, 'IN_PROGRESS'),
       resolved: count(byStatus, 'RESOLVED'),
       unassigned,
+      overdue,
+      scope: user.role === 'MANAGER' ? 'team' : 'visible',
       mine: {
         open: count(mine, 'OPEN'),
         inProgress: count(mine, 'IN_PROGRESS'),

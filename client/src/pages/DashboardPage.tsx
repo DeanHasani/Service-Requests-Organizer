@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import { motion } from 'motion/react';
 import {
   Activity as ActivityIcon,
+  AlarmClock,
   BriefcaseBusiness,
   CircleCheckBig,
   CircleDot,
@@ -57,7 +58,9 @@ function StatusLedger({ data, isManager }: { data?: DashboardSummary; isManager:
     value: data?.total,
     to: '/requests',
     icon: Layers,
-    note: 'Everything logged, open or closed',
+    note: isManager
+      ? 'Everything logged, open or closed'
+      : 'Yours, what you reported, and all resolved work',
   };
   const statuses = [
     {
@@ -81,14 +84,24 @@ function StatusLedger({ data, isManager }: { data?: DashboardSummary; isManager:
       icon: CircleCheckBig,
       note: 'closed out',
     },
-    {
-      label: 'Unassigned',
-      value: data?.unassigned,
-      to: '/unassigned',
-      icon: UserRoundX,
-      note: 'without an owner',
-      alert: (data?.unassigned ?? 0) > 0,
-    },
+    // Managers: the review queue. Employees: what is past its deadline among their work.
+    isManager
+      ? {
+          label: 'To review',
+          value: data?.unassigned,
+          to: '/unassigned',
+          icon: UserRoundX,
+          note: 'waiting for an owner',
+          alert: (data?.unassigned ?? 0) > 0,
+        }
+      : {
+          label: 'Overdue',
+          value: data?.overdue,
+          to: '/requests?due=overdue',
+          icon: AlarmClock,
+          note: 'past the deadline',
+          alert: (data?.overdue ?? 0) > 0,
+        },
   ];
   const total = Math.max(1, data?.total ?? 1);
   // Managers never own requests, so their card shows what the team is carrying instead.

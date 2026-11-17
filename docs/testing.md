@@ -62,7 +62,7 @@ success with `SR-000001` reference, `OPEN` status and a `CREATED` activity; defa
 
 ### Request management
 
-retrieve; 404 for missing, 400 for invalid ids; edit logs one activity per changed field (unchanged fields ignored); empty edit rejected; stale edit rejected with 409 and the first edit kept; search by title, requester, description and reference; filters by status, priority, source, assignee (`me`, `none`, id); priority sorts by urgency; date sorting both ways; pagination totals; invalid query parameters rejected; assign, then reassign, then unassign with matching history; deactivated assignee refused; a manager can never be made the assignee; unassigning an in-progress request moves it to Open; employee claim.
+retrieve; 404 for missing, 400 for invalid ids; edit logs one activity per changed field (unchanged fields ignored); empty edit rejected; stale edit rejected with 409 and the first edit kept; search by title, requester, description and reference; filters by status, priority, source, assignee (`me`, `none`, id); priority sorts by urgency; date sorting both ways; pagination totals; invalid query parameters rejected; assign, then reassign, then unassign with matching history; deactivated assignee refused; a manager can never be made the assignee; unassigning an in-progress request moves it to Open; employees cannot assign, including to themselves. accounts-and-visibility.test.ts: change password (other sessions end), sign out everywhere, manager reset with forced change, last-manager guard, employee visibility (list, detail, notes, activity, feed, dashboard), team view by role, deadlines (set, move, clear, overdue filter, sort), insights.
 
 ### Status
 

@@ -5,32 +5,36 @@
 - Requests come in by phone, email or message. A staff member types them in. There is no integration with any of those channels.
 - The requester is not a user. They never log in and are never notified.
 - One request has at most one assignee at a time. Pairing up is handled through notes.
-- Everyone can see every request. The problem the brief describes is unclear ownership, so all staff keep full visibility.
+- Managers see every request. Employees see the requests assigned to them, the ones they reported, and every resolved request (read-only, as a record of how things were fixed). Anything else is reported as not found, so request ids reveal nothing.
 - Notes are internal only.
 
 ## Roles
 
 | Action                                                                  | Manager     | Employee                               |
 | ----------------------------------------------------------------------- | ----------- | -------------------------------------- |
-| View all requests, details, notes, activity                             | Yes         | Yes                                    |
-| Create a request                                                        | Yes         | Yes (may only assign it to themselves) |
+| View requests, details, notes, activity                                 | All         | Own, reported, and all resolved        |
+| Create a request                                                        | Yes         | Yes (starts Open, Unassigned, Normal)  |
 | Edit details (title, description, requester, contact, source, priority) | Any request | No                                     |
+| Set or change a deadline                                                | Any request | No                                     |
 | Start work, resolve                                                     | No          | Only requests assigned to them         |
 | Reopen a resolved request                                               | Any request | Only requests assigned to them         |
 | Add a note                                                              | Any request | Only requests assigned to them         |
 | Assign, reassign, unassign (to employees only)                          | Any request | No                                     |
 | Be the assignee of a request                                            | No          | Yes                                    |
-| Claim an unassigned request                                             | No          | Yes (assigns it to themselves)         |
-| View team and workload                                                  | Yes         | Yes (read-only)                        |
-| Create users, activate / deactivate                                     | Yes         | No                                     |
+| View team and workload                                                  | Everyone    | Manager and active coworkers, no email |
+| View someone's insights                                                 | Anyone      | Only their own (Profile)               |
+| Create users, activate / deactivate, reset passwords                    | Yes         | No                                     |
+| Change own password, sign out everywhere                                | Yes         | Yes                                    |
 
 Decisions where the brief was open:
 
 - The manager owns what a request is and the employee owns the work. Only managers edit details and priority. Only the assigned employee starts and resolves work; the manager tracks progress and can send resolved work back by reopening it. Every save is explicit: changes to assignee, priority or details wait for a Save changes button, and closing an edited form asks before discarding.
 - Managers are never assignees. The manager triages and hands out work, and only active employees can own a request. The server rejects assigning a manager and the assignee pickers list employees only. For the same reason managers have no My requests page, and their dashboard shows the team's workload instead of their own.
-- Employees can claim unassigned requests. The core problem in the brief is that nobody knows who is responsible, and letting someone say "mine" without waiting for a manager fixes that. They still cannot take a request from a colleague.
+- Managers dispatch all work. Employees report requests, which start Open, Unassigned and Normal with no deadline, and the manager reviews them in To review, setting priority, deadline and owner in one step. Employees cannot assign anything, including to themselves.
 - Employees can reopen their own resolved requests if they find the fix did not hold.
-- Employees can see the Team page (read only) so they know who is busy. Only managers get the account controls.
+- Employees see the Team page with their manager set apart from their coworkers, so the hierarchy is clear. Coworkers' emails and insights stay private. Managers see their employees (other managers sit in a separate section) and open anyone's insights.
+- There is no email service, so passwords are not reset by email. A manager issues a one-time temporary password; the person must choose their own before they can do anything else, and every session they had is ended. New accounts work the same way. If no manager can sign in, `npm run user:reset-password -- <email>` on the server does the same. The last active manager cannot be deactivated.
+- When someone leaves for good, a manager deactivates the account and can then delete it, confirming by typing the person's name. A deleted account can never sign in, leaves the team lists and frees its email, but its row is kept: every request, note and history entry still shows who did the work, and the account records when and by whom it was deleted. Nobody can delete their own account or the last manager.
 
 ## Request lifecycle
 

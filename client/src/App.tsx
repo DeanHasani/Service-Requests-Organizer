@@ -15,6 +15,9 @@ import { NewRequestPage } from './pages/NewRequestPage';
 import { RequestDetailPage } from './pages/RequestDetailPage';
 import { UnassignedPage } from './pages/UnassignedPage';
 import { TeamPage } from './pages/TeamPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { MemberPage } from './pages/MemberPage';
+import { ChooseNewPasswordPage } from './pages/ChooseNewPasswordPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 export function makeQueryClient() {
@@ -58,6 +61,7 @@ function RequireAuth() {
         replace
       />
     );
+  if (user.mustChangePassword) return <ChooseNewPasswordPage />;
   return <AppShell />;
 }
 
@@ -73,6 +77,8 @@ export function AppRoutes() {
         <Route path="my" element={<RequestsPage scope="mine" />} />
         <Route path="unassigned" element={<UnassignedPage />} />
         <Route path="team" element={<TeamPage />} />
+        <Route path="team/:id" element={<MemberPage />} />
+        <Route path="profile" element={<ProfilePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

@@ -6,11 +6,11 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
   CheckCircle2,
-  Hand,
   MessageSquareText,
   PencilLine,
   PlayCircle,
   RotateCcw,
+  X,
 } from 'lucide-react';
 import {
   canChangeStatus,
@@ -43,7 +43,7 @@ import {
 import { ApiError, errorMessage } from '../lib/api';
 import { ErrorPage, ErrorState, errorKind } from '../components/errors';
 import { ActivitySkeleton, NotesSkeleton, RequestDetailSkeleton } from '../components/skeletons';
-import { formatDateTime, timeAgo } from '../lib/format';
+import { formatDate, formatDateTime, fromDateInput, timeAgo, toDateInput } from '../lib/format';
 import { ActivityList } from '../components/ActivityList';
 import { ContactField } from '../components/ContactField';
 import { toast } from 'sonner';
@@ -60,6 +60,7 @@ import {
   Textarea,
 } from '../components/ui';
 import {
+  DueBadge,
   LifecycleRail,
   PriorityBadge,
   RequestRef,
@@ -107,7 +108,8 @@ function RequestView({ request: r }: { request: ServiceRequest }) {
         to="/requests"
         className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink"
       >
-        <ArrowLeft className="size-3.5" aria-hidden /> All requests
+        <ArrowLeft className="size-3.5" aria-hidden />{' '}
+        {user.role === 'MANAGER' ? 'All requests' : 'Requests'}
       </Link>
 
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -116,6 +118,7 @@ function RequestView({ request: r }: { request: ServiceRequest }) {
             <RequestRef value={r.referenceNumber} className="text-[13px]" />
             <StatusBadge status={r.status} />
             <PriorityBadge priority={r.priority} />
+            <DueBadge dueAt={r.dueAt} status={r.status} />
           </div>
           <h1 className="mt-2 text-[22px] leading-tight font-semibold tracking-[-0.015em] text-ink">
             {r.title}
@@ -166,7 +169,7 @@ function statusLine(r: ServiceRequest, user: User): ReactNode {
   if (!owner) {
     return user.role === 'MANAGER'
       ? 'Nobody owns this yet. Choose an assignee in Details.'
-      : 'Nobody owns this yet. Assign it to yourself to start.';
+      : 'Waiting for your manager to review it and choose who works on it.';
   }
   if (owner.id === user.id) {
     return r.status === 'OPEN'
@@ -179,7 +182,6 @@ function statusLine(r: ServiceRequest, user: User): ReactNode {
 
 function LifecyclePanel({ request: r, user }: { request: ServiceRequest; user: User }) {
   const change = useChangeStatus(r.id);
-  const assign = useAssign(r.id);
   const [confirmReopen, setConfirmReopen] = useState(false);
   const [pending, setPending] = useState<Status | null>(null);
 
@@ -197,7 +199,6 @@ function LifecyclePanel({ request: r, user }: { request: ServiceRequest; user: U
 
   const owned = { assignedToId: r.assignedTo?.id ?? null, status: r.status };
   const may = (to: Status) => canTransition(r.status, to) && canChangeStatus(user, owned, to);
-  const canClaim = user.role === 'EMPLOYEE' && !r.assignedTo && r.status !== 'RESOLVED';
 
   return (
     <Panel>
@@ -209,16 +210,6 @@ function LifecyclePanel({ request: r, user }: { request: ServiceRequest; user: U
           {statusLine(r, user)}
         </p>
         <div className="flex flex-wrap gap-2">
-          {canClaim && (
-            <Button
-              variant="primary"
-              size="sm"
-              loading={assign.isPending}
-              onClick={() => assign.mutate({ assignedToId: user.id, version: r.version })}
-            >
-              <Hand className="size-3.5" aria-hidden /> Assign to me
-            </Button>
-          )}
           {may('IN_PROGRESS') && (
             <Button
               size="sm"
@@ -312,6 +303,16 @@ function PropertiesPanel({ request: r, user }: { request: ServiceRequest; user: 
             <Row label="Priority">
               <PriorityBadge priority={r.priority} />
             </Row>
+            <Row label="Deadline">
+              {r.dueAt ? (
+                <span className="flex flex-wrap items-center gap-x-2">
+                  <time dateTime={r.dueAt}>{formatDate(r.dueAt)}</time>
+                  <DueBadge dueAt={r.dueAt} status={r.status} />
+                </span>
+              ) : (
+                <span className="text-ink-3">None</span>
+              )}
+            </Row>
           </>
         )}
         <Row label="Source">
@@ -343,7 +344,10 @@ function PropertiesPanel({ request: r, user }: { request: ServiceRequest; user: 
   );
 }
 
-/** Manager's assignee and priority. Changes wait for an explicit Save; nothing saves on its own. */
+/**
+ * Manager's assignee, priority and deadline. Changes wait for an explicit Save; nothing saves on
+ * its own.
+ */
 function TriageEditor({ request: r }: { request: ServiceRequest }) {
   const assignees = useAssignees();
   const assign = useAssign(r.id);
@@ -351,10 +355,14 @@ function TriageEditor({ request: r }: { request: ServiceRequest }) {
   const savedAssignee = String(r.assignedTo?.id ?? '');
   const [assignee, setAssignee] = useState(savedAssignee);
   const [priority, setPriority] = useState<Priority>(r.priority);
+  const savedDue = toDateInput(r.dueAt);
+  const [due, setDue] = useState(savedDue);
   const [confirmUnassign, setConfirmUnassign] = useState(false);
   const assigneeChanged = assignee !== savedAssignee;
   const priorityChanged = priority !== r.priority;
-  const dirty = assigneeChanged || priorityChanged;
+  const dueChanged = due !== savedDue;
+  const detailsChanged = priorityChanged || dueChanged;
+  const dirty = assigneeChanged || detailsChanged;
   const saving = assign.isPending || update.isPending;
 
   // Warn before leaving the page with unsaved changes.
@@ -368,16 +376,23 @@ function TriageEditor({ request: r }: { request: ServiceRequest }) {
   const discard = () => {
     setAssignee(savedAssignee);
     setPriority(r.priority);
+    setDue(savedDue);
   };
 
   const save = async () => {
     setConfirmUnassign(false);
     try {
       let version = r.version;
-      if (priorityChanged) version = (await update.mutateAsync({ priority, version })).version;
+      if (detailsChanged) {
+        const changes = {
+          ...(priorityChanged && { priority }),
+          ...(dueChanged && { dueAt: fromDateInput(due) }),
+        };
+        version = (await update.mutateAsync({ ...changes, version })).version;
+      }
       if (assigneeChanged) {
         await assign.mutateAsync({ assignedToId: assignee ? Number(assignee) : null, version });
-        if (!priorityChanged) toast.success('Changes saved');
+        if (!detailsChanged) toast.success('Changes saved');
       }
     } catch {
       /* the mutation shows the error and refreshes the request */
@@ -421,6 +436,29 @@ function TriageEditor({ request: r }: { request: ServiceRequest }) {
             </option>
           ))}
         </Select>
+      </Row>
+      <Row label="Deadline" changed={dueChanged}>
+        <span className="flex items-center gap-1.5">
+          <Input
+            type="date"
+            aria-label="Deadline"
+            value={due}
+            onChange={(e) => setDue(e.target.value)}
+            disabled={saving}
+          />
+          {due && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setDue('')}
+              disabled={saving}
+              aria-label="Remove deadline"
+              title="Remove deadline"
+            >
+              <X className="size-3.5" aria-hidden />
+            </Button>
+          )}
+        </span>
       </Row>
       <AnimatePresence initial={false}>
         {dirty && (

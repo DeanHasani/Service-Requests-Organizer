@@ -23,7 +23,7 @@ export const setUnauthorizedHandler = (fn: UnauthorizedHandler) => {
   onUnauthorized = fn;
 };
 
-type Method = 'GET' | 'POST' | 'PATCH';
+type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
@@ -63,6 +63,7 @@ export const api = {
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
+  delete: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
 };
 
 export const errorMessage = (err: unknown) =>

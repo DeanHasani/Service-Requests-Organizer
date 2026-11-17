@@ -15,7 +15,7 @@ DESKFLOW is a full-stack service request tracker for a small internal IT support
 | Create request                                                                                                                          | Fields checked when you leave them (minimum lengths, contact with a phone, email or extension picker that filters what can be typed), double-submit protection (disabled button plus server idempotency key), success toast, opens the new request          |
 | Request page                                                                                                                            | Every field, lifecycle rail with Start work, Resolve and Reopen, edit dialog, assign, reassign and unassign (with confirmation), inline priority, resolution details, internal notes, activity history                                                      |
 | My requests                                                                                                                             | Your assigned requests with search, status and priority filters, and an empty state                                                                                                                                                                         |
-| Unassigned                                                                                                                              | Open requests with no owner, most urgent first; managers assign in one step, employees claim                                                                                                                                                                |
+| To review                                                                                                                               | Open requests with no owner, most urgent first; managers set priority, deadline and owner in one step                                                                                                                                                       |
 | Team                                                                                                                                    | Members, roles, account status, active and resolved counts with a workload bar; managers add members and deactivate or reactivate accounts                                                                                                                  |
 | Errors and loading                                                                                                                      | Separate pages for page not found, request not found, no access, server error, server unreachable and crashes; errors inside one panel stay in that panel; skeletons shaped like each page while data loads                                                 |
 |  SQLite via Prisma with migrations, foreign keys, unique constraints, indexes, transactions, optimistic concurrency, an idempotent seed |
@@ -33,7 +33,7 @@ A React single-page app talks to an Express REST API on the same origin. The API
 - The create form sends a key generated in the browser, so a double click, a retry or a second open tab still produces one request.
 - `SR-000001` style numbers come from a counter row that is incremented inside the create transaction, so two requests can never get the same number.
 - Every change is saved in the same transaction as its activity entries.
-- Where the brief left room, duties are split cleanly. The manager creates, edits, assigns and tracks; they can reopen resolved work but never start or resolve it and are never an assignee. The assigned employee starts, notes and resolves the work and can reopen it. Employees can claim unassigned work. Unassigning a request that is in progress moves it back to Open. [docs/assumptions.md](docs/assumptions.md) lists each of these.
+- Where the brief left room, duties are split cleanly. The manager creates, edits, assigns and tracks; they can reopen resolved work but never start or resolve it and are never an assignee. The assigned employee starts, notes and resolves the work and can reopen it. Unassigning a request that is in progress moves it back to Open. [docs/assumptions.md](docs/assumptions.md) lists each of these.
 
 ## Testing results
 
@@ -60,15 +60,14 @@ The UI review went through two rounds of desktop (1440 px) and mobile (390 px) s
 - The client bundle is about 670 kB before compression (one chunk). Route-level code splitting would reduce first load.
 - Demo credentials are documented in the README only, not shown in the app. A real deployment should change the seeded passwords.
 - Two places build the navy "New request" link by hand instead of using the shared button component; it looks the same but is duplicated styling.
-- Every signed-in user can read every request and the team list. That fits a shared queue; a stricter setup could limit it.
+- Employees see their own and reported requests plus all resolved ones; the team list shows them names and workload only. Dashboard totals for employees are counted over what they can see.
 
 ## Unfinished functionality
 
-Everything the brief requires is built. These were left out because the brief does not ask for them: password reset, notifications, attachments, SLA timers, request deletion, editing or deleting notes, and integrations with email, phone or chat.
+Everything the brief requires is built. These were left out because the brief does not ask for them: self-service password reset by email (managers reset passwords instead), notifications, attachments, SLA timers, request deletion, editing or deleting notes, and integrations with email, phone or chat.
 
 ## Future improvements
 
-- Password reset and "change my password"
 - Email or in-app notifications when a request is assigned to you
 - SLA targets per priority, with overdue highlighting
 - Saved filters and a keyboard command palette

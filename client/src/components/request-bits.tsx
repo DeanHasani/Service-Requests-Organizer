@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Check, Mail, MessageSquare, MoreHorizontal, Phone } from 'lucide-react';
+import { CalendarClock, Check, Mail, MessageSquare, MoreHorizontal, Phone } from 'lucide-react';
 import {
   PRIORITY_LABEL,
   SOURCE_LABEL,
@@ -9,7 +9,7 @@ import {
   type Source,
   type Status,
 } from '@deskflow/shared';
-import { cx } from '../lib/format';
+import { cx, daysUntil, formatDate, formatShortDate } from '../lib/format';
 
 const statusTone: Record<Status, { text: string; bg: string; dot: string }> = {
   OPEN: { text: 'text-open', bg: 'bg-open-soft', dot: 'bg-open' },
@@ -217,6 +217,46 @@ export function RequestRef({ value, className }: { value: string; className?: st
   return (
     <span className={cx('tabular text-xs font-medium tracking-[0.01em] text-ink-3', className)}>
       {value}
+    </span>
+  );
+}
+
+/**
+ * Deadline at a glance. Quiet when there is time left; amber within two days; red once overdue.
+ * Resolved work shows nothing: the deadline no longer matters.
+ */
+export function DueBadge({
+  dueAt,
+  status,
+  className,
+}: {
+  dueAt: string | null;
+  status: Status;
+  className?: string;
+}) {
+  if (!dueAt || status === 'RESOLVED') return null;
+  const days = daysUntil(dueAt);
+  const overdue = new Date(dueAt).getTime() < Date.now();
+  const label = overdue
+    ? days === 0
+      ? 'Overdue today'
+      : `Overdue ${formatShortDate(dueAt)}`
+    : days === 0
+      ? 'Due today'
+      : days === 1
+        ? 'Due tomorrow'
+        : `Due ${formatShortDate(dueAt)}`;
+  return (
+    <span
+      title={`Deadline: ${formatDate(dueAt)}`}
+      className={cx(
+        'inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap',
+        overdue ? 'text-urgent' : days <= 2 ? 'text-high' : 'text-ink-2',
+        className,
+      )}
+    >
+      <CalendarClock className="size-3.5 shrink-0" aria-hidden />
+      {label}
     </span>
   );
 }

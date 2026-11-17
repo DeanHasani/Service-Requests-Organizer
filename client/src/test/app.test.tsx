@@ -225,14 +225,13 @@ describe('create request', () => {
     );
   });
 
-  it('only offers employees themselves as assignee', async () => {
+  it('leaves priority, deadline and assignee to the manager when an employee reports', async () => {
     mockApi({ ...signedInAs(employee) });
     renderApp('/requests/new');
-    const select = await screen.findByLabelText(/Assignee/);
-    const options = within(select)
-      .getAllByRole('option')
-      .map((o) => o.textContent);
-    expect(options).toEqual(['Unassigned', 'Me (Dean Hasani)']);
+    expect(await screen.findByText(/Your manager reviews new requests/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Assignee/)).toBeNull();
+    expect(screen.queryByLabelText(/Deadline/)).toBeNull();
+    expect(screen.queryByText('Urgent')).toBeNull();
   });
 });
 

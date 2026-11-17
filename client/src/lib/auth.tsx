@@ -2,7 +2,7 @@ import { createContext, use, useEffect, useMemo, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import type { LoginInput, SessionInfo, User } from '@deskflow/shared';
+import type { ChangePasswordInput, LoginInput, SessionInfo, User } from '@deskflow/shared';
 import { api, ApiError, setCsrfToken, setUnauthorizedHandler } from './api';
 
 type AuthValue = {
@@ -13,6 +13,10 @@ type AuthValue = {
   retryBoot: () => void;
   login: (input: LoginInput) => Promise<User>;
   logout: () => Promise<void>;
+  /** Signs this account out on every device, this one included. */
+  logoutEverywhere: () => Promise<void>;
+  /** Replaces the password; other devices are signed out, this session stays. */
+  changePassword: (input: ChangePasswordInput) => Promise<User>;
 };
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -61,6 +65,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const signOutLocally = () => {
+    setCsrfToken(null);
+    qc.clear();
+    qc.setQueryData(ME, null);
+    navigate('/login', { replace: true });
+  };
+
   const value = useMemo<AuthValue>(
     () => ({
       user: me.data ?? null,
@@ -72,13 +83,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           await api.post('/auth/logout');
         } finally {
-          setCsrfToken(null);
-          qc.clear();
-          qc.setQueryData(ME, null);
-          navigate('/login', { replace: true });
+          signOutLocally();
         }
       },
+      logoutEverywhere: async () => {
+        await api.post('/auth/logout-all');
+        signOutLocally();
+        toast.success('Signed out on every device');
+      },
+      changePassword: async (input) => {
+        const s = await api.post<SessionInfo>('/auth/password', input);
+        setCsrfToken(s.csrfToken);
+        qc.setQueryData(ME, s.user);
+        return s.user;
+      },
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- signOutLocally only uses qc and navigate
     [me, loginMutation, qc, navigate],
   );
 

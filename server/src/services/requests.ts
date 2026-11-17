@@ -37,11 +37,42 @@ const log = (tx: Tx, requestId: number, actorId: number, entries: LogEntry[]) =>
     ? tx.activityLog.createMany({ data: entries.map((e) => ({ ...e, requestId, actorId })) })
     : null;
 
-async function load(id: number, tx: Tx | typeof prisma = prisma) {
-  const row = await tx.request.findUnique({ where: { id }, include: requestInclude });
+/**
+ * What a user may read. Managers: everything. Employees: requests assigned to them or reported
+ * by them, plus every resolved request. Mirrors `canSeeRequest` in shared/domain.
+ */
+export function visibleWhere(user: AuthUser): Prisma.RequestWhereInput {
+  if (user.role === 'MANAGER') return {};
+  return {
+    OR: [{ assignedToId: user.id }, { createdById: user.id }, { status: 'RESOLVED' }],
+  };
+}
+
+/**
+ * Loads a request the user is allowed to see. Anything else is reported as not found, so
+ * request ids cannot be used to discover what exists.
+ */
+async function load(id: number, user: AuthUser, tx: Tx | typeof prisma = prisma) {
+  const row = await tx.request.findFirst({
+    where: { AND: [{ id }, visibleWhere(user)] },
+    include: requestInclude,
+  });
   if (!row) throw notFound('Request');
   return row;
 }
+
+/** For routes that only need to know the request exists and is visible (notes, activity). */
+export async function requireVisible(id: number, user: AuthUser) {
+  const row = await prisma.request.findFirst({
+    where: { AND: [{ id }, visibleWhere(user)] },
+    select: { id: true, assignedToId: true },
+  });
+  if (!row) throw notFound('Request');
+  return row;
+}
+
+const formatDue = (d: Date | null) =>
+  d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
 
 /** Only active employees can own requests; managers triage and assign, they don't take work. */
 async function activeAssignee(tx: Tx, id: number) {
@@ -77,9 +108,13 @@ export async function listRequests(
   query: z.output<typeof listRequestsQuerySchema>,
   user: AuthUser,
 ): Promise<Page<ServiceRequest>> {
-  const { q, status, priority, source, assignee, sort, order, page, pageSize } = query;
-  const where: Prisma.RequestWhereInput = {
+  const { q, status, priority, source, assignee, due, sort, order, page, pageSize } = query;
+  const filters: Prisma.RequestWhereInput = {
     ...(status && { status }),
+    ...(due === 'overdue' && {
+      dueAt: { lt: new Date() },
+      ...(status ? {} : { status: { not: 'RESOLVED' as const } }),
+    }),
     ...(priority && { priority }),
     ...(source && { source }),
     ...(assignee !== undefined && {
@@ -96,13 +131,17 @@ export async function listRequests(
       ],
     }),
   };
+  const where: Prisma.RequestWhereInput = { AND: [filters, visibleWhere(user)] };
   const sortKey = sort === 'priority' ? 'priorityRank' : sort === 'referenceNumber' ? 'id' : sort;
+  // Requests without a deadline go last whichever way deadlines are sorted.
+  const primary: Prisma.RequestOrderByWithRelationInput =
+    sortKey === 'dueAt' ? { dueAt: { sort: order, nulls: 'last' } } : { [sortKey]: order };
   const [total, rows] = await prisma.$transaction([
     prisma.request.count({ where }),
     prisma.request.findMany({
       where,
       include: requestInclude,
-      orderBy: [{ [sortKey]: order }, { id: order }],
+      orderBy: [primary, { id: order }],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -116,8 +155,8 @@ export async function listRequests(
   };
 }
 
-export async function getRequest(id: number) {
-  return toRequest(await load(id));
+export async function getRequest(id: number, user: AuthUser) {
+  return toRequest(await load(id, user));
 }
 
 // ---------- commands ----------
@@ -140,10 +179,18 @@ export async function createRequest(
   const prior = await replay();
   if (prior) return prior;
 
+  // Employees report requests; the manager reviews them and sets priority, deadline and owner.
   const assigneeId = input.assignedToId ?? null;
-  if (assigneeId !== null && !canAssign(user, { assignedToId: null }, assigneeId)) {
-    throw forbidden('Employees can only assign new requests to themselves');
+  const priority = input.priority ?? 'NORMAL';
+  if (
+    !canAssign(user) &&
+    (assigneeId !== null || priority !== 'NORMAL' || (input.dueAt ?? null) !== null)
+  ) {
+    throw forbidden(
+      'New requests from employees go to the manager, who sets the priority, deadline and assignee',
+    );
   }
+  const dueAt = input.dueAt ? new Date(input.dueAt) : null;
 
   try {
     const id = await prisma.$transaction(async (tx) => {
@@ -153,12 +200,14 @@ export async function createRequest(
         create: { name: 'request', value: 1 },
         update: { value: { increment: 1 } },
       });
-      const { assignedToId: _a, ...fields } = input;
+      const { assignedToId: _a, dueAt: _d, ...fields } = input;
       const created = await tx.request.create({
         data: {
           ...fields,
+          priority,
+          dueAt,
           referenceNumber: formatReference(counter.value),
-          priorityRank: PRIORITY_RANK[input.priority],
+          priorityRank: PRIORITY_RANK[priority],
           assignedToId: assignee?.id ?? null,
           createdById: user.id,
         },
@@ -166,6 +215,15 @@ export async function createRequest(
       const entries: LogEntry[] = [
         { actionType: 'CREATED', description: `created ${created.referenceNumber}` },
       ];
+      if (dueAt) {
+        entries.push({
+          actionType: 'DEADLINE_CHANGED',
+          fieldName: 'dueAt',
+          oldValue: null,
+          newValue: formatDue(dueAt),
+          description: `set the deadline to ${formatDue(dueAt)}`,
+        });
+      }
       if (assignee) {
         entries.push({
           actionType: 'ASSIGNED',
@@ -178,7 +236,7 @@ export async function createRequest(
       await log(tx, created.id, user.id, entries);
       return created.id;
     });
-    return { request: await getRequest(id), created: true };
+    return { request: await getRequest(id, user), created: true };
   } catch (err) {
     // Two identical submissions raced past the first check; return the winner.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -214,7 +272,7 @@ const display = (field: (typeof EDITABLE)[number], value: string) =>
 
 export async function updateRequest(id: number, input: UpdateRequestInput, user: AuthUser) {
   await prisma.$transaction(async (tx) => {
-    const current = await load(id, tx);
+    const current = await load(id, user, tx);
     if (!canEditDetails(user)) throw forbidden('Only managers can edit request details');
     if (current.status === 'RESOLVED')
       throw rule('REQUEST_RESOLVED', 'Reopen the request before editing it');
@@ -236,6 +294,25 @@ export async function updateRequest(id: number, input: UpdateRequestInput, user:
             : `updated the ${FIELD_LABEL[field]}`,
       });
     }
+    if (input.dueAt !== undefined) {
+      const next = input.dueAt === null ? null : new Date(input.dueAt);
+      if ((next?.getTime() ?? null) !== (current.dueAt?.getTime() ?? null)) {
+        data.dueAt = next;
+        const before = formatDue(current.dueAt);
+        const after = formatDue(next);
+        entries.push({
+          actionType: 'DEADLINE_CHANGED',
+          fieldName: 'dueAt',
+          oldValue: before,
+          newValue: after,
+          description: !after
+            ? 'removed the deadline'
+            : before && before !== after
+              ? `moved the deadline from ${before} to ${after}`
+              : `set the deadline to ${after}`,
+        });
+      }
+    }
     if (!entries.length) {
       if (current.version !== input.version) throw staleVersion();
       return;
@@ -244,7 +321,7 @@ export async function updateRequest(id: number, input: UpdateRequestInput, user:
     await writeIfCurrent(tx, id, input.version, data);
     await log(tx, id, user.id, entries);
   });
-  return getRequest(id);
+  return getRequest(id, user);
 }
 
 export async function changeStatus(
@@ -253,7 +330,7 @@ export async function changeStatus(
   user: AuthUser,
 ) {
   await prisma.$transaction(async (tx) => {
-    const current = await load(id, tx);
+    const current = await load(id, user, tx);
     if (!canChangeStatus(user, current, status)) {
       throw forbidden(
         user.role === 'MANAGER'
@@ -302,7 +379,7 @@ export async function changeStatus(
             },
     ]);
   });
-  return getRequest(id);
+  return getRequest(id, user);
 }
 
 export async function assignRequest(
@@ -311,14 +388,8 @@ export async function assignRequest(
   user: AuthUser,
 ) {
   await prisma.$transaction(async (tx) => {
-    const current = await load(id, tx);
-    if (!canAssign(user, current, assignedToId)) {
-      throw forbidden(
-        user.role === 'MANAGER'
-          ? undefined
-          : 'Employees can only claim unassigned requests for themselves',
-      );
-    }
+    const current = await load(id, user, tx);
+    if (!canAssign(user)) throw forbidden('Only managers assign requests');
     if (current.status === 'RESOLVED')
       throw rule('REQUEST_RESOLVED', 'Reopen the request before reassigning it');
     if (current.assignedToId === assignedToId) {
@@ -345,12 +416,9 @@ export async function assignRequest(
             fieldName: 'assignedTo',
             oldValue: prevName,
             newValue: next.name,
-            description:
-              next.id === user.id && !prevName
-                ? 'claimed the request'
-                : prevName
-                  ? `reassigned the request from ${prevName} to ${next.name}`
-                  : `assigned the request to ${next.name}`,
+            description: prevName
+              ? `reassigned the request from ${prevName} to ${next.name}`
+              : `assigned the request to ${next.name}`,
           },
     ];
     if (reopen) {
@@ -364,7 +432,7 @@ export async function assignRequest(
     }
     await log(tx, id, user.id, entries);
   });
-  return getRequest(id);
+  return getRequest(id, user);
 }
 
 /** Used when a user is deactivated: release their unresolved work so nothing is stranded. */

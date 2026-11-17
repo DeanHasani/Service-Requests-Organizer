@@ -10,7 +10,11 @@
 
 **Assignee**: the single active employee responsible for a request. A request can be unassigned.
 
-**Claim**: an employee assigning an unassigned request to themselves.
+**Review queue (To review)**: open, unassigned requests waiting for a manager to set priority, deadline and owner. Employees cannot claim work; the manager assigns it.
+
+**Deadline**: the date a manager expects a request resolved by, end of day. Overdue means past it and not resolved.
+
+**Temporary password**: a one-time password from a manager (on reset or for a new account). The holder must choose their own before using the app.
 
 **Status**: where the request is in its lifecycle: Open, In progress or Resolved.
 

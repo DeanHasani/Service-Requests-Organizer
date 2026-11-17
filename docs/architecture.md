@@ -38,28 +38,35 @@ In development Vite serves the client on `:5173` and proxies `/api` to the API o
 
 ### Endpoints
 
-| Method | Path                           | Who                                               |
-| ------ | ------------------------------ | ------------------------------------------------- |
-| POST   | `/api/auth/login`              | anyone (rate limited)                             |
-| POST   | `/api/auth/logout`             | signed in                                         |
-| GET    | `/api/auth/me`                 | signed in                                         |
-| GET    | `/api/users`, `/api/users/:id` | signed in                                         |
-| POST   | `/api/users`                   | manager                                           |
-| PATCH  | `/api/users/:id` (`isActive`)  | manager                                           |
-| GET    | `/api/requests`                | signed in                                         |
-| GET    | `/api/requests/:id`            | signed in                                         |
-| POST   | `/api/requests`                | signed in                                         |
-| PATCH  | `/api/requests/:id`            | manager or assignee                               |
-| PATCH  | `/api/requests/:id/status`     | manager or assignee                               |
-| PATCH  | `/api/requests/:id/assignment` | manager; employee may claim an unassigned request |
-| GET    | `/api/requests/:id/notes`      | signed in                                         |
-| POST   | `/api/requests/:id/notes`      | manager or assignee                               |
-| GET    | `/api/requests/:id/activity`   | signed in                                         |
-| GET    | `/api/activity?limit=`         | signed in                                         |
-| GET    | `/api/dashboard`               | signed in                                         |
-| GET    | `/api/health`                  | anyone                                            |
+| Method | Path                              | Who                                               |
+| ------ | --------------------------------- | ------------------------------------------------- |
+| POST   | `/api/auth/login`                 | anyone (rate limited)                             |
+| POST   | `/api/auth/logout`                | signed in                                         |
+| POST   | `/api/auth/logout-all`            | signed in (ends every session of the caller)      |
+| POST   | `/api/auth/password`              | signed in (current password required)             |
+| GET    | `/api/auth/me`                    | signed in                                         |
+| GET    | `/api/users`                      | manager: everyone; employee: active, no emails    |
+| GET    | `/api/users/:id`, `/:id/insights` | manager: anyone; employee: only themselves        |
+| POST   | `/api/users`                      | manager                                           |
+| POST   | `/api/users/:id/reset-password`   | manager (not for themselves)                      |
+| DELETE | `/api/users/:id` (`confirmName`)  | manager; deactivated accounts only, not yourself  |
+| PATCH  | `/api/users/:id` (`isActive`)     | manager                                           |
+| GET    | `/api/requests`                   | signed in (employees: only what they can see)     |
+| GET    | `/api/requests/:id`               | signed in (404 if not visible)                    |
+| POST   | `/api/requests`                   | signed in (employees: no priority/deadline/owner) |
+| PATCH  | `/api/requests/:id`               | manager                                           |
+| PATCH  | `/api/requests/:id/status`        | manager (reopen) or assignee                      |
+| PATCH  | `/api/requests/:id/assignment`    | manager                                           |
+| GET    | `/api/requests/:id/notes`         | signed in (404 if not visible)                    |
+| POST   | `/api/requests/:id/notes`         | manager or assignee                               |
+| GET    | `/api/requests/:id/activity`      | signed in (404 if not visible)                    |
+| GET    | `/api/activity?limit=`            | signed in (visible requests only)                 |
+| GET    | `/api/dashboard`                  | signed in (counted over visible requests)         |
+| GET    | `/api/health`                     | anyone                                            |
 
-`GET /api/requests` accepts `q`, `status`, `priority`, `source`, `assignee` (`me`, `none` or a user id), `sort` (`createdAt`, `updatedAt`, `priority`, `referenceNumber`, `title`), `order`, `page` and `pageSize` (max 100).
+`GET /api/requests` accepts `q`, `status`, `priority`, `source`, `assignee` (`me`, `none` or a user id), `due` (`overdue`), `sort` (`createdAt`, `updatedAt`, `priority`, `referenceNumber`, `title`, `dueAt`; undated requests sort last), `order`, `page` and `pageSize` (max 100).
+
+While a user still has a temporary password, every call except `/auth/me`, `/auth/password` and `/auth/logout` returns 403 `PASSWORD_CHANGE_REQUIRED`.
 
 ## Authentication flow
 

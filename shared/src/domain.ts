@@ -20,6 +20,7 @@ export const ACTION_TYPES = [
   'STATUS_CHANGED',
   'RESOLVED',
   'REOPENED',
+  'DEADLINE_CHANGED',
 ] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
 
@@ -59,19 +60,47 @@ export function formatReference(n: number): string {
 
 type Actor = { id: number; role: Role };
 type Owned = { assignedToId: number | null };
+type Visible = Owned & { createdById: number; status: Status };
+
+/**
+ * Managers see everything. Employees see what is theirs (assigned to them or reported by them)
+ * plus every resolved request, read-only, as a record of how things were fixed.
+ */
+export function canSeeRequest(user: Actor, request: Visible): boolean {
+  return (
+    user.role === 'MANAGER' ||
+    request.assignedToId === user.id ||
+    request.createdById === user.id ||
+    request.status === 'RESOLVED'
+  );
+}
+
+/** Past its deadline and still not resolved. */
+export function isOverdue(
+  request: { dueAt: string | Date | null; status: Status },
+  now = Date.now(),
+): boolean {
+  return (
+    request.dueAt !== null &&
+    request.status !== 'RESOLVED' &&
+    new Date(request.dueAt).getTime() < now
+  );
+}
 
 /** Add notes. Managers: any request. Employees: only requests assigned to them. */
 export function canWorkOn(user: Actor, request: Owned): boolean {
   return user.role === 'MANAGER' || request.assignedToId === user.id;
 }
 
-/** Set an arbitrary assignee. Employees may only claim an unassigned request for themselves. */
-export function canAssign(user: Actor, request: Owned, assigneeId: number | null): boolean {
-  if (user.role === 'MANAGER') return true;
-  return request.assignedToId === null && assigneeId === user.id;
+/** Managers dispatch all work: only they assign, reassign or unassign. */
+export function canAssign(user: Actor): boolean {
+  return user.role === 'MANAGER';
 }
 
-/** What the request is (title, description, requester, source, priority) is the manager's to change. */
+/**
+ * What the request is (title, description, requester, source, priority, deadline) is the
+ * manager's to change.
+ */
 export function canEditDetails(user: Actor): boolean {
   return user.role === 'MANAGER';
 }

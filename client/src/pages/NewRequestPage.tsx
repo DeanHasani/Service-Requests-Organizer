@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Controller, useForm, type Path } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Mail, MessageSquare, MoreHorizontal, Phone } from 'lucide-react';
+import { Info, Mail, MessageSquare, MoreHorizontal, Phone } from 'lucide-react';
 import {
   createRequestSchema,
   PRIORITIES,
@@ -13,6 +13,7 @@ import type { z } from 'zod';
 import { useCurrentUser } from '../lib/auth';
 import { useAssignees, useCreateRequest } from '../lib/queries';
 import { ApiError } from '../lib/api';
+import { fromDateInput, toDateInput } from '../lib/format';
 import { Button, Field, Input, PageHeader, Panel, Select, Textarea } from '../components/ui';
 import { Segmented } from '../components/Segmented';
 import { ContactField } from '../components/ContactField';
@@ -39,7 +40,8 @@ const priorityOptions = PRIORITIES.map((p) => ({
 export function NewRequestPage() {
   const user = useCurrentUser();
   const navigate = useNavigate();
-  const assignees = useAssignees();
+  const isEmployee = user.role === 'EMPLOYEE';
+  const assignees = useAssignees({ enabled: !isEmployee });
   const create = useCreateRequest();
   // One idempotency key per form: a double click or a retry after a timeout cannot create a duplicate.
   const [clientRequestId] = useState(() => crypto.randomUUID());
@@ -79,7 +81,6 @@ export function NewRequestPage() {
     }
   });
 
-  const isEmployee = user.role === 'EMPLOYEE';
   const busy = isSubmitting || create.isPending;
 
   return (
@@ -139,42 +140,63 @@ export function NewRequestPage() {
             registration={register('source')}
             error={errors.source?.message}
           />
-          <Segmented
-            legend="Priority"
-            options={priorityOptions}
-            registration={register('priority')}
-            error={errors.priority?.message}
-          />
+          {isEmployee ? (
+            <p className="flex gap-2.5 rounded-control bg-cobalt-soft px-3.5 py-3 text-sm text-ink">
+              <Info className="mt-0.5 size-4 shrink-0 text-cobalt" aria-hidden />
+              Your manager reviews new requests and sets the priority, the deadline and who works on
+              it. It starts as Normal priority and unassigned.
+            </p>
+          ) : (
+            <>
+              <Segmented
+                legend="Priority"
+                options={priorityOptions}
+                registration={register('priority')}
+                error={errors.priority?.message}
+              />
 
-          <Field
-            id="assignedToId"
-            label="Assignee"
-            optional
-            error={errors.assignedToId?.message}
-            hint={
-              isEmployee ? 'You can assign it to yourself or leave it for a manager.' : undefined
-            }
-          >
-            <Select
-              id="assignedToId"
-              aria-invalid={!!errors.assignedToId}
-              {...register('assignedToId', {
-                setValueAs: (v) => (v === '' || v === null ? null : Number(v)),
-              })}
-            >
-              <option value="">Unassigned</option>
-              {isEmployee ? (
-                <option value={user.id}>Me ({user.name})</option>
-              ) : (
-                assignees.data?.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                    {u.activeCount ? ` (${u.activeCount})` : ''}
-                  </option>
-                ))
-              )}
-            </Select>
-          </Field>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <Field
+                  id="assignedToId"
+                  label="Assignee"
+                  optional
+                  error={errors.assignedToId?.message}
+                  hint="Leave it unassigned to decide later in To review."
+                >
+                  <Select
+                    id="assignedToId"
+                    aria-invalid={!!errors.assignedToId}
+                    {...register('assignedToId', {
+                      setValueAs: (v) => (v === '' || v === null ? null : Number(v)),
+                    })}
+                  >
+                    <option value="">Unassigned</option>
+                    {assignees.data?.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                        {u.activeCount ? ` (${u.activeCount})` : ''}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field
+                  id="dueAt"
+                  label="Deadline"
+                  optional
+                  error={errors.dueAt?.message}
+                  hint="Due by the end of that day."
+                >
+                  <Input
+                    id="dueAt"
+                    type="date"
+                    min={toDateInput(new Date().toISOString())}
+                    aria-invalid={!!errors.dueAt}
+                    {...register('dueAt', { setValueAs: (v) => fromDateInput(v ?? '') })}
+                  />
+                </Field>
+              </div>
+            </>
+          )}
 
           <div className="mt-2 flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">
             <Link

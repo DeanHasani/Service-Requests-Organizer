@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router';
+import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { AnimatePresence, motion } from 'motion/react';
-import { Inbox, LayoutGrid, ListTodo, LogOut, Menu, Plus, UserRound, Users, X } from 'lucide-react';
+import {
+  ClipboardCheck,
+  Inbox,
+  LayoutGrid,
+  ListTodo,
+  LogOut,
+  Menu,
+  Plus,
+  Users,
+  X,
+} from 'lucide-react';
 import { ROLE_LABEL } from '@deskflow/shared';
 import { useAuth, useCurrentUser } from '../lib/auth';
 import { useDashboard } from '../lib/queries';
@@ -83,11 +93,22 @@ function SidebarContent() {
       </div>
       <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5 px-3 pt-2">
         <NavItem to="/" end icon={LayoutGrid} label="Dashboard" />
-        <NavItem to="/requests" icon={Inbox} label="All requests" />
+        <NavItem
+          to="/requests"
+          icon={Inbox}
+          label={user.role === 'MANAGER' ? 'All requests' : 'Requests'}
+        />
         {user.role === 'EMPLOYEE' && (
           <NavItem to="/my" icon={ListTodo} label="My requests" count={mine} />
         )}
-        <NavItem to="/unassigned" icon={UserRound} label="Unassigned" count={summary?.unassigned} />
+        {user.role === 'MANAGER' && (
+          <NavItem
+            to="/unassigned"
+            icon={ClipboardCheck}
+            label="To review"
+            count={summary?.unassigned}
+          />
+        )}
         <NavItem to="/team" icon={Users} label="Team" />
         <NavLink
           to="/requests/new"
@@ -97,11 +118,19 @@ function SidebarContent() {
         </NavLink>
       </nav>
       <div className="flex items-center gap-3 border-t border-white/8 px-4 py-4">
-        <Avatar name={user.name} size="md" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium text-white">{user.name}</p>
-          <p className="text-xs text-navy-ink-dim">{ROLE_LABEL[user.role]}</p>
-        </div>
+        <Link
+          to="/profile"
+          title="Your profile"
+          className="-m-1.5 flex min-w-0 flex-1 items-center gap-3 rounded-md p-1.5 transition-colors hover:bg-navy-2"
+        >
+          <Avatar name={user.name} size="md" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-medium text-white">{user.name}</span>
+            <span className="block text-xs text-navy-ink-dim">
+              {ROLE_LABEL[user.role]} · Profile
+            </span>
+          </span>
+        </Link>
         <button
           type="button"
           onClick={() => void logout()}

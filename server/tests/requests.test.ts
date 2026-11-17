@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRequest, resetDb, signIn, validRequest, type Client, type Users } from './helpers';
+import { prisma } from '../src/db';
 
 let users: Users;
 let mia: Client;
@@ -105,12 +106,33 @@ describe('request creation', () => {
     });
   });
 
-  it('lets an employee create a request assigned to themselves but not to others', async () => {
-    expect(
-      (await ann.post('/api/requests', validRequest({ assignedToId: users.ann.id }))).status,
-    ).toBe(201);
-    const res = await ann.post('/api/requests', validRequest({ assignedToId: users.bob.id }));
-    expect(res.status).toBe(403);
+  it('sends employee requests to the manager: open, unassigned, normal, no deadline', async () => {
+    const res = await ann.post('/api/requests', validRequest({ priority: undefined }));
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({
+      status: 'OPEN',
+      assignedTo: null,
+      priority: 'NORMAL',
+      dueAt: null,
+      createdBy: { id: users.ann.id },
+    });
+    // Sending Normal explicitly is fine; it is the default anyway.
+    expect((await ann.post('/api/requests', validRequest({ priority: 'NORMAL' }))).status).toBe(
+      201,
+    );
+  });
+
+  it('refuses priority, deadline or assignee from an employee', async () => {
+    for (const extra of [
+      { assignedToId: users.ann.id },
+      { assignedToId: users.bob.id },
+      { priority: 'URGENT' },
+      { priority: undefined, dueAt: new Date(Date.now() + 86_400_000).toISOString() },
+    ]) {
+      const res = await ann.post('/api/requests', validRequest(extra));
+      expect(res.status).toBe(403);
+    }
+    expect(await prisma.request.count()).toBe(0);
   });
 
   it('generates unique sequential references, even under concurrent creates', async () => {
@@ -147,7 +169,7 @@ describe('request creation', () => {
 
 describe('request management', () => {
   it('retrieves a request by id', async () => {
-    const created = await createRequest(mia);
+    const created = await createRequest(mia, { assignedToId: users.ann.id });
     const res = await ann.get(`/api/requests/${created.id}`);
     expect(res.status).toBe(200);
     expect(res.body.data.title).toBe('Printer offline');
@@ -352,15 +374,14 @@ describe('assignment', () => {
     expect(res.body.data.status).toBe('OPEN');
   });
 
-  it('lets an employee claim an unassigned request', async () => {
-    const r = await createRequest(mia);
+  it('does not let employees claim work: the manager assigns it', async () => {
+    const r = await createRequest(ann, { priority: undefined });
     const res = await ann.patch(`/api/requests/${r.id}/assignment`, {
       assignedToId: users.ann.id,
       version: 0,
     });
-    expect(res.status).toBe(200);
-    const activity = (await ann.get(`/api/requests/${r.id}/activity`)).body.data;
-    expect(activity.at(-1).description).toBe('claimed the request');
+    expect(res.status).toBe(403);
+    expect((await mia.get(`/api/requests/${r.id}`)).body.data.assignedTo).toBeNull();
   });
 });
 

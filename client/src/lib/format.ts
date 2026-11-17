@@ -41,3 +41,34 @@ export const initials = (name: string) =>
 
 export const cx = (...parts: (string | false | null | undefined)[]) =>
   parts.filter(Boolean).join(' ');
+
+// ---------- deadlines ----------
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** `YYYY-MM-DD` in local time, for `<input type="date">`. */
+export const toDateInput = (iso: string | null) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/** A picked date means "by the end of that day", local time. Empty clears the deadline. */
+export const fromDateInput = (value: string): string | null => {
+  if (!value) return null;
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(y!, m! - 1, d!, 23, 59, 59, 999).toISOString();
+};
+
+const DAY_MS = 86_400_000;
+/** Whole local days from today to the deadline: 0 today, 1 tomorrow, -1 yesterday. */
+export const daysUntil = (iso: string, now = new Date()) => {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const due = new Date(iso);
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
+  return Math.round((dueDay - start) / DAY_MS);
+};
+
+/** "3.5 h" under a day, otherwise "2.1 days". */
+export const formatDuration = (hours: number) =>
+  hours < 24 ? `${hours.toFixed(1)} h` : `${(hours / 24).toFixed(1)} days`;

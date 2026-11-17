@@ -32,6 +32,7 @@ import { RequestListSkeleton } from '../components/skeletons';
 import { cx, formatDateTime, formatShortDate } from '../lib/format';
 import { Avatar, Button, EmptyState, Input, PageHeader, Panel, Select } from '../components/ui';
 import {
+  DueBadge,
   LifecycleRail,
   PriorityBadge,
   RequestRef,
@@ -40,7 +41,7 @@ import {
 } from '../components/request-bits';
 
 type Scope = 'all' | 'mine';
-const FILTER_KEYS = ['q', 'status', 'priority', 'source', 'assignee'] as const;
+const FILTER_KEYS = ['q', 'status', 'priority', 'source', 'assignee', 'due'] as const;
 
 function useDebounced<T>(value: T, ms = 300) {
   const [v, setV] = useState(value);
@@ -84,14 +85,15 @@ export function RequestsPage({ scope }: { scope: Scope }) {
     priority: get('priority') as ListRequestsQuery['priority'],
     source: get('source') as ListRequestsQuery['source'],
     assignee: scope === 'mine' ? 'me' : (get('assignee') as ListRequestsQuery['assignee']),
+    due: get('due') === 'overdue' ? 'overdue' : undefined,
     sort,
     order,
     page,
     pageSize: 15,
   };
   const list = useRequests(query);
-  const assignees = useAssignees();
   const isManager = useCurrentUser().role === 'MANAGER';
+  const assignees = useAssignees({ enabled: isManager });
   const hasFilters = FILTER_KEYS.some((k) => params.get(k));
 
   const clear = () => {
@@ -99,19 +101,25 @@ export function RequestsPage({ scope }: { scope: Scope }) {
     update(Object.fromEntries(FILTER_KEYS.map((k) => [k, undefined])));
   };
 
-  const toggleSort = (field: SortField) =>
-    update({ sort: field, order: sort === field && order === 'desc' ? 'asc' : 'desc' }, false);
+  // Deadlines read soonest first; everything else newest or highest first.
+  const toggleSort = (field: SortField) => {
+    const first = field === 'dueAt' ? 'asc' : 'desc';
+    const flipped = first === 'asc' ? 'desc' : 'asc';
+    update({ sort: field, order: sort === field && order === first ? flipped : first }, false);
+  };
 
   const open = (r: ServiceRequest) => navigate(`/requests/${r.id}`);
 
   return (
     <>
       <PageHeader
-        title={scope === 'mine' ? 'My requests' : 'All requests'}
+        title={scope === 'mine' ? 'My requests' : isManager ? 'All requests' : 'Requests'}
         subtitle={
           scope === 'mine'
             ? 'Requests assigned to you, newest first.'
-            : 'Every request the team has registered.'
+            : isManager
+              ? 'Every request the team has registered.'
+              : 'Your requests, the ones you reported, and everything the team has resolved.'
         }
         actions={
           <Link
@@ -191,13 +199,23 @@ export function RequestsPage({ scope }: { scope: Scope }) {
               <option value="">Assignee</option>
               {!isManager && <option value="me">Assigned to me</option>}
               <option value="none">Unassigned</option>
-              {assignees.data?.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
+              {isManager &&
+                assignees.data?.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
             </Select>
           )}
+          <Select
+            aria-label="Filter by deadline"
+            value={get('due') ?? ''}
+            onChange={(e) => update({ due: e.target.value })}
+            className="w-full sm:w-32"
+          >
+            <option value="">Deadline</option>
+            <option value="overdue">Overdue</option>
+          </Select>
           {hasFilters && (
             <Button variant="ghost" size="sm" onClick={clear} className="col-span-2 sm:col-span-1">
               <X className="size-3.5" aria-hidden /> Clear filters
@@ -237,12 +255,7 @@ export function RequestsPage({ scope }: { scope: Scope }) {
             <EmptyState
               icon={<ListTodo />}
               title="You don't have any assigned requests at the moment."
-              body="Pick something up from the unassigned queue."
-              action={
-                <Link to="/unassigned" className="text-sm font-medium text-cobalt hover:underline">
-                  View unassigned requests
-                </Link>
-              }
+              body="When your manager assigns you something, it shows up here."
             />
           ) : (
             <EmptyState
@@ -302,6 +315,7 @@ const columns: {
   { label: 'Source', className: 'w-[4rem]', show: 'hidden xl:table-cell' },
   { label: 'Priority', sort: 'priority', className: 'w-[6rem]' },
   { label: 'Status', className: 'w-[7.25rem]' },
+  { label: 'Deadline', sort: 'dueAt', className: 'w-[8rem]', show: 'hidden lg:table-cell' },
   { label: 'Assignee', className: 'w-[10rem]' },
   // Created and Updated share one stacked column so Title keeps the width.
   {
@@ -459,6 +473,13 @@ function RequestTable({
               <td className="px-2.5 py-3">
                 <StatusBadge status={r.status} />
               </td>
+              <td className="hidden px-2.5 py-3 lg:table-cell">
+                {r.dueAt && r.status !== 'RESOLVED' ? (
+                  <DueBadge dueAt={r.dueAt} status={r.status} />
+                ) : (
+                  <span className="text-ink-3">–</span>
+                )}
+              </td>
               <td className="px-2.5 py-3">
                 {r.assignedTo ? (
                   <span className="flex min-w-0 items-center gap-2">
@@ -499,7 +520,10 @@ function MobileList({ items }: { items: ServiceRequest[] }) {
                 <LifecycleRail status={r.status} size="xs" />
                 <RequestRef value={r.referenceNumber} className="text-[11px]" />
               </span>
-              <PriorityBadge priority={r.priority} />
+              <span className="flex items-center gap-3">
+                <DueBadge dueAt={r.dueAt} status={r.status} />
+                <PriorityBadge priority={r.priority} />
+              </span>
             </span>
             <span className="mt-1.5 block text-[15px] font-medium text-ink">{r.title}</span>
             <span className="mt-1 flex items-center justify-between gap-3 text-xs text-ink-2">
