@@ -167,8 +167,9 @@ function StatusLedger({ data, isManager }: { data?: DashboardSummary; isManager:
         </Link>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 px-2 pb-1">
+        {/* Status split. Taller on hover, when each colour shows its share inside it. */}
         <div
-          className="flex h-2 min-w-48 flex-1 overflow-hidden rounded-full bg-sunken"
+          className="group flex h-3.5 min-w-48 flex-1 overflow-hidden rounded-full bg-sunken transition-[height] duration-300 ease-out hover:h-5"
           role="img"
           aria-label={
             data
@@ -179,19 +180,39 @@ function StatusLedger({ data, isManager }: { data?: DashboardSummary; isManager:
           {data &&
             (
               [
-                [data.open, 'bg-open'],
-                [data.inProgress, 'bg-progress-dot'],
-                [data.resolved, 'bg-resolved-dot'],
+                [data.open, 'bg-open', 'text-white', 'Open'],
+                [data.inProgress, 'bg-progress-dot', 'text-navy', 'In progress'],
+                [data.resolved, 'bg-resolved-dot', 'text-white', 'Resolved'],
               ] as const
-            ).map(([n, bg], i) => (
-              <motion.span
-                key={bg}
-                className={cx('h-full origin-left', bg, i > 0 && 'border-l-2 border-surface')}
-                initial={{ width: 0 }}
-                animate={{ width: `${(n / total) * 100}%` }}
-                transition={{ duration: 0.7, ease: [0.77, 0, 0.175, 1], delay: 0.1 + i * 0.08 }}
-              />
-            ))}
+            ).map(([n, bg, ink, label], i) => {
+              const pct = Math.round((n / total) * 100);
+              return (
+                <motion.span
+                  key={bg}
+                  title={`${label}: ${n} (${pct}%)`}
+                  className={cx(
+                    'grid h-full origin-left place-items-center overflow-hidden',
+                    bg,
+                    i > 0 && 'border-l-2 border-surface',
+                  )}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(n / total) * 100}%` }}
+                  transition={{ duration: 0.7, ease: [0.77, 0, 0.175, 1], delay: 0.1 + i * 0.08 }}
+                >
+                  {/* Hidden on slivers too thin to hold the number */}
+                  {pct >= 3 && (
+                    <span
+                      className={cx(
+                        'tabular text-[11px] leading-none font-semibold whitespace-nowrap opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-hover:delay-100',
+                        ink,
+                      )}
+                    >
+                      {pct}%
+                    </span>
+                  )}
+                </motion.span>
+              );
+            })}
         </div>
         <p className="text-[13px] text-ink-2">
           {data ? (
