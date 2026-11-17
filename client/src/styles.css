@@ -224,8 +224,8 @@ dialog.df-dialog[open]::backdrop {
     0 22px 44px -16px rgb(15 27 45 / 0.34);
 }
 
-/* On desktop, the hovered card grows and pushes its neighbours aside. */
-@media (min-width: 1024px) {
+/* On wide screens (one row of cards), the hovered card grows and pushes its neighbours aside. */
+@media (min-width: 1280px) {
   .ledger > .ledger-cell,
   .ledger-row > .ledger-cell,
   .ledger-row {

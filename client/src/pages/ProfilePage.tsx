@@ -48,7 +48,7 @@ export function ProfilePage() {
       )}
 
       <h2 className="mt-8 mb-3 text-lg font-bold text-ink">Account</h2>
-      <div className="grid items-start gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
         <Panel>
           <PanelHeader title="Change password" />
           <div className="p-4 sm:p-5">

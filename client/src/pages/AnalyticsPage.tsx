@@ -71,11 +71,11 @@ function AnalyticsView() {
           )}
         >
           <Summary data={q.data} range={range} />
-          <div className="grid items-start gap-6 xl:grid-cols-2">
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-2">
             <CategoryPanel data={q.data} />
             <TrendPanel data={q.data} />
           </div>
-          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
             <WorkloadPanel data={q.data} />
             <ReopenedPanel data={q.data} />
           </div>
@@ -140,7 +140,7 @@ function Summary({ data, range }: { data: Analytics; range: AnalyticsRange }) {
     },
   ];
   return (
-    <section aria-label="Summary" className="ledger grid grid-cols-2 gap-3 md:grid-cols-3 lg:flex">
+    <section aria-label="Summary" className="ledger grid grid-cols-2 gap-3 md:grid-cols-3 xl:flex">
       {tiles.map(({ label, value, note, icon: Icon }) => (
         <div
           key={label}

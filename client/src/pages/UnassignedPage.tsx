@@ -103,7 +103,8 @@ function ReviewRow({ request: r }: { request: ServiceRequest }) {
   const [assignee, setAssignee] = useState('');
 
   return (
-    <div className="flex flex-col gap-4 bg-surface px-4 py-4 xl:flex-row xl:items-center xl:gap-6">
+    // Request on top at full width, the review controls in one row underneath.
+    <div className="flex flex-col gap-3 bg-surface px-4 py-4">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <RequestRef value={r.referenceNumber} className="text-[11px]" />
@@ -133,7 +134,7 @@ function ReviewRow({ request: r }: { request: ServiceRequest }) {
         </p>
       </div>
       <form
-        className="grid w-full shrink-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center"
+        className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center"
         onSubmit={(e) => {
           e.preventDefault();
           if (!assignee) return;

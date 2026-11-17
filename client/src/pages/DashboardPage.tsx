@@ -44,7 +44,7 @@ export function DashboardPage() {
       ) : (
         <StatusLedger data={summary.data} isManager={user.role === 'MANAGER'} />
       )}
-      <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <RecentRequests />
         <RecentActivity />
       </div>
@@ -126,11 +126,11 @@ function StatusLedger({ data, isManager }: { data?: DashboardSummary; isManager:
     <Panel className="p-3">
       {/* Desktop: Total | 2x2 statuses | workload. Hovering a card grows it and squeezes its
           neighbours (flex-grow transitions in styles.css). Phones: a plain two-column grid. */}
-      <div className="ledger grid grid-cols-2 gap-3 lg:flex lg:h-[184px]">
-        <StatCard {...total_} big className="col-span-2 lg:col-span-1" />
-        <div className="ledger-mid contents lg:flex lg:flex-col lg:gap-3">
+      <div className="ledger grid grid-cols-2 gap-3 xl:flex xl:h-[184px]">
+        <StatCard {...total_} big className="col-span-2 xl:col-span-1" />
+        <div className="ledger-mid contents xl:flex xl:flex-col xl:gap-3">
           {[statuses.slice(0, 2), statuses.slice(2)].map((row, i) => (
-            <div key={i} className="ledger-row contents lg:flex lg:gap-3">
+            <div key={i} className="ledger-row contents xl:flex xl:gap-3">
               {row.map((c) => (
                 <StatCard key={c.label} {...c} />
               ))}
@@ -139,7 +139,7 @@ function StatusLedger({ data, isManager }: { data?: DashboardSummary; isManager:
         </div>
         <Link
           to={card?.to ?? (isManager ? '/team' : '/my')}
-          className="ledger-cell col-span-2 flex flex-col justify-between gap-2 rounded-panel bg-navy p-5 text-navy-ink hover:bg-navy-2 lg:col-span-1"
+          className="ledger-cell col-span-2 flex flex-col justify-between gap-2 rounded-panel bg-navy p-5 text-navy-ink hover:bg-navy-2 xl:col-span-1"
         >
           <span className="flex items-start justify-between gap-2">
             <span>

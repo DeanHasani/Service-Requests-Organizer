@@ -80,7 +80,7 @@ export function InsightsView({ data, self }: { data: Insights; self: boolean }) 
       </section>
 
       {isEmployee && (
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <Panel>
             <PanelHeader title={self ? 'What you’re working on' : `What ${first} is working on`} />
             {data.activeRequests.length ? (

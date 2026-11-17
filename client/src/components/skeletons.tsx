@@ -153,7 +153,7 @@ export function RequestDetailSkeleton() {
         </div>
         <Bar className="h-9 w-20 rounded-control" />
       </div>
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-6">
           <Panel>
             <div className="grid grid-cols-3 px-6 pt-5 pb-4">
