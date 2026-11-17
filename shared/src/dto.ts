@@ -67,6 +67,10 @@ export type ServiceRequest = {
   resolvedAt: ISODate | null;
   /** Deadline set by a manager. */
   dueAt: ISODate | null;
+  /** Optional rule: the priority it rises to once the deadline is under 24 hours away. */
+  escalateTo: Priority | null;
+  /** When that rule ran (it runs once); null while it is still waiting. */
+  escalatedAt: ISODate | null;
   createdAt: ISODate;
   updatedAt: ISODate;
 };

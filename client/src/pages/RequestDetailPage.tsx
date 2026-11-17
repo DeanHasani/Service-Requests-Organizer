@@ -10,13 +10,13 @@ import {
   PencilLine,
   PlayCircle,
   RotateCcw,
-  X,
 } from 'lucide-react';
 import {
   canChangeStatus,
   canEditDetails,
   canTransition,
   canWorkOn,
+  ESCALATION_HOURS,
   noteSchema,
   PRIORITIES,
   PRIORITY_LABEL,
@@ -43,7 +43,13 @@ import {
 import { ApiError, errorMessage } from '../lib/api';
 import { ErrorPage, ErrorState, errorKind } from '../components/errors';
 import { ActivitySkeleton, NotesSkeleton, RequestDetailSkeleton } from '../components/skeletons';
-import { formatDate, formatDateTime, fromDateInput, timeAgo, toDateInput } from '../lib/format';
+import { formatDateTime, formatDeadline, timeAgo } from '../lib/format';
+import {
+  DeadlineInput,
+  deadlineOf,
+  deadlineToIso,
+  sameDeadline,
+} from '../components/DeadlineInput';
 import { ActivityList } from '../components/ActivityList';
 import { ContactField } from '../components/ContactField';
 import { toast } from 'sonner';
@@ -60,6 +66,7 @@ import {
   Textarea,
 } from '../components/ui';
 import {
+  Countdown,
   DueBadge,
   LifecycleRail,
   PriorityBadge,
@@ -305,14 +312,21 @@ function PropertiesPanel({ request: r, user }: { request: ServiceRequest; user: 
             </Row>
             <Row label="Deadline">
               {r.dueAt ? (
-                <span className="flex flex-wrap items-center gap-x-2">
-                  <time dateTime={r.dueAt}>{formatDate(r.dueAt)}</time>
-                  <DueBadge dueAt={r.dueAt} status={r.status} />
+                <span className="flex flex-col items-start gap-1">
+                  <time dateTime={r.dueAt}>{formatDeadline(r.dueAt)}</time>
+                  <Countdown dueAt={r.dueAt} status={r.status} />
                 </span>
               ) : (
-                <span className="text-ink-3">None</span>
+                <span className="text-ink-3">Not set</span>
               )}
             </Row>
+            {r.dueAt && r.escalateTo && (
+              <Row label="Auto priority">
+                {r.escalatedAt
+                  ? `Raised to ${PRIORITY_LABEL[r.escalateTo]}`
+                  : `Rises to ${PRIORITY_LABEL[r.escalateTo]} in the last ${ESCALATION_HOURS} h`}
+              </Row>
+            )}
           </>
         )}
         <Row label="Source">
@@ -355,13 +369,18 @@ function TriageEditor({ request: r }: { request: ServiceRequest }) {
   const savedAssignee = String(r.assignedTo?.id ?? '');
   const [assignee, setAssignee] = useState(savedAssignee);
   const [priority, setPriority] = useState<Priority>(r.priority);
-  const savedDue = toDateInput(r.dueAt);
+  const savedDue = deadlineOf(r.dueAt);
   const [due, setDue] = useState(savedDue);
   const [confirmUnassign, setConfirmUnassign] = useState(false);
   const assigneeChanged = assignee !== savedAssignee;
   const priorityChanged = priority !== r.priority;
-  const dueChanged = due !== savedDue;
-  const detailsChanged = priorityChanged || dueChanged;
+  const dueChanged = !sameDeadline(due, savedDue);
+  const savedEscalate = r.escalateTo ?? '';
+  const [escalate, setEscalate] = useState<string>(savedEscalate);
+  // The rule only means something with a deadline; clearing the deadline drops it.
+  const nextEscalate = due.date ? escalate : '';
+  const escalateChanged = nextEscalate !== savedEscalate;
+  const detailsChanged = priorityChanged || dueChanged || escalateChanged;
   const dirty = assigneeChanged || detailsChanged;
   const saving = assign.isPending || update.isPending;
 
@@ -377,6 +396,7 @@ function TriageEditor({ request: r }: { request: ServiceRequest }) {
     setAssignee(savedAssignee);
     setPriority(r.priority);
     setDue(savedDue);
+    setEscalate(savedEscalate);
   };
 
   const save = async () => {
@@ -386,7 +406,8 @@ function TriageEditor({ request: r }: { request: ServiceRequest }) {
       if (detailsChanged) {
         const changes = {
           ...(priorityChanged && { priority }),
-          ...(dueChanged && { dueAt: fromDateInput(due) }),
+          ...(dueChanged && { dueAt: deadlineToIso(due) }),
+          ...(escalateChanged && { escalateTo: (nextEscalate || null) as Priority | null }),
         };
         version = (await update.mutateAsync({ ...changes, version })).version;
       }
@@ -437,29 +458,49 @@ function TriageEditor({ request: r }: { request: ServiceRequest }) {
           ))}
         </Select>
       </Row>
-      <Row label="Deadline" changed={dueChanged}>
-        <span className="flex items-center gap-1.5">
-          <Input
-            type="date"
-            aria-label="Deadline"
-            value={due}
-            onChange={(e) => setDue(e.target.value)}
-            disabled={saving}
-          />
-          {due && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setDue('')}
-              disabled={saving}
-              aria-label="Remove deadline"
-              title="Remove deadline"
-            >
-              <X className="size-3.5" aria-hidden />
-            </Button>
+      {/* Full width: date and time need more room than the value column gives */}
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <dt className="flex items-center gap-1.5 text-[13px] text-ink-3">
+            Deadline
+            {(dueChanged || escalateChanged) && (
+              <span className="size-1.5 rounded-full bg-cobalt" title="Changed, not saved yet">
+                <span className="sr-only">(changed, not saved yet)</span>
+              </span>
+            )}
+          </dt>
+          {r.dueAt ? (
+            <Countdown dueAt={r.dueAt} status={r.status} />
+          ) : (
+            <span className="text-[13px] text-ink-3">Not set</span>
           )}
-        </span>
-      </Row>
+        </div>
+        <dd className="mt-2 flex flex-col gap-2">
+          <DeadlineInput value={due} onChange={setDue} disabled={saving} clearable />
+          {due.date && (
+            <label className="flex flex-col gap-1 text-[13px] text-ink-2">
+              In the last {ESCALATION_HOURS} hours, raise priority to
+              <Select
+                value={escalate}
+                onChange={(e) => setEscalate(e.target.value)}
+                disabled={saving}
+              >
+                <option value="">Keep as it is</option>
+                {PRIORITIES.filter((p) => p !== 'LOW').map((p) => (
+                  <option key={p} value={p}>
+                    {PRIORITY_LABEL[p]}
+                  </option>
+                ))}
+              </Select>
+              {r.escalatedAt && r.escalateTo && escalate === savedEscalate && (
+                <span className="text-xs text-ink-3">
+                  Already raised to {PRIORITY_LABEL[r.escalateTo]}. A new deadline re-arms it.
+                </span>
+              )}
+            </label>
+          )}
+        </dd>
+      </div>
       <AnimatePresence initial={false}>
         {dirty && (
           <motion.div

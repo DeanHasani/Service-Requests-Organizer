@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { CalendarClock, Check, Mail, MessageSquare, MoreHorizontal, Phone } from 'lucide-react';
 import {
@@ -9,7 +10,14 @@ import {
   type Source,
   type Status,
 } from '@deskflow/shared';
-import { cx, daysUntil, formatDate, formatShortDate } from '../lib/format';
+import {
+  cx,
+  daysUntil,
+  deadlineTime,
+  formatCountdown,
+  formatDeadline,
+  formatShortDate,
+} from '../lib/format';
 
 const statusTone: Record<Status, { text: string; bg: string; dot: string }> = {
   OPEN: { text: 'text-open', bg: 'bg-open-soft', dot: 'bg-open' },
@@ -237,18 +245,22 @@ export function DueBadge({
   if (!dueAt || status === 'RESOLVED') return null;
   const days = daysUntil(dueAt);
   const overdue = new Date(dueAt).getTime() < Date.now();
+  const time = deadlineTime(dueAt);
+  const at = time ? `, ${time}` : '';
   const label = overdue
     ? days === 0
-      ? 'Overdue today'
+      ? time
+        ? `Overdue since ${time}`
+        : 'Overdue today'
       : `Overdue ${formatShortDate(dueAt)}`
     : days === 0
-      ? 'Due today'
+      ? `Due today${at}`
       : days === 1
-        ? 'Due tomorrow'
-        : `Due ${formatShortDate(dueAt)}`;
+        ? `Due tomorrow${at}`
+        : `Due ${formatShortDate(dueAt)}${at}`;
   return (
     <span
-      title={`Deadline: ${formatDate(dueAt)}`}
+      title={`Deadline: ${formatDeadline(dueAt)}`}
       className={cx(
         'inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap',
         overdue ? 'text-urgent' : days <= 2 ? 'text-high' : 'text-ink-2',
@@ -257,6 +269,55 @@ export function DueBadge({
     >
       <CalendarClock className="size-3.5 shrink-0" aria-hidden />
       {label}
+    </span>
+  );
+}
+
+/** Re-renders every `ms` so time-based text stays current. */
+function useNow(ms: number) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(t);
+  }, [ms]);
+  return now;
+}
+
+/**
+ * Live time left until the deadline ("2d 5h left"), amber in the last 24 hours and red once
+ * overdue. Nothing for resolved work or when there is no deadline.
+ */
+export function Countdown({
+  dueAt,
+  status,
+  className,
+}: {
+  dueAt: string | null;
+  status: Status;
+  className?: string;
+}) {
+  const now = useNow(20_000);
+  if (!dueAt || status === 'RESOLVED') return null;
+  const left = new Date(dueAt).getTime() - now;
+  return (
+    <span
+      role="timer"
+      aria-label={`Deadline: ${formatCountdown(dueAt, now)}`}
+      className={cx(
+        'tabular inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap',
+        left <= 0
+          ? 'bg-urgent-soft text-urgent'
+          : left < 86_400_000
+            ? 'bg-high-soft text-high'
+            : 'bg-sunken text-ink-2',
+        className,
+      )}
+    >
+      <span
+        aria-hidden
+        className={cx('size-1.5 rounded-full bg-current', left > 0 && 'animate-pulse')}
+      />
+      {formatCountdown(dueAt, now)}
     </span>
   );
 }

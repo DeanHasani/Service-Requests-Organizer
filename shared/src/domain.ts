@@ -75,6 +75,9 @@ export function canSeeRequest(user: Actor, request: Visible): boolean {
   );
 }
 
+/** How close to the deadline an automatic priority rule kicks in. */
+export const ESCALATION_HOURS = 24;
+
 /** Past its deadline and still not resolved. */
 export function isOverdue(
   request: { dueAt: string | Date | null; status: Status },

@@ -5,6 +5,7 @@ import {
   canChangeStatus,
   canEditDetails,
   formatReference,
+  ESCALATION_HOURS,
   PRIORITY_LABEL,
   SOURCE_LABEL,
   STATUS_LABEL,
@@ -71,8 +72,18 @@ export async function requireVisible(id: number, user: AuthUser) {
   return row;
 }
 
-const formatDue = (d: Date | null) =>
-  d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+/**
+ * "Nov 20, 2026", plus the time when one was picked ("Nov 20, 2026, 2:00 PM"). A deadline with no
+ * time is stored as the last millisecond of the day and shown as the date alone.
+ */
+const formatDue = (d: Date | null) => {
+  if (!d) return null;
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const endOfDay = d.getHours() === 23 && d.getMinutes() === 59 && d.getSeconds() === 59;
+  return endOfDay
+    ? date
+    : `${date}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+};
 
 /** Only active employees can own requests; managers triage and assign, they don't take work. */
 async function activeAssignee(tx: Tx, id: number) {
@@ -184,13 +195,17 @@ export async function createRequest(
   const priority = input.priority ?? 'NORMAL';
   if (
     !canAssign(user) &&
-    (assigneeId !== null || priority !== 'NORMAL' || (input.dueAt ?? null) !== null)
+    (assigneeId !== null ||
+      priority !== 'NORMAL' ||
+      (input.dueAt ?? null) !== null ||
+      (input.escalateTo ?? null) !== null)
   ) {
     throw forbidden(
       'New requests from employees go to the manager, who sets the priority, deadline and assignee',
     );
   }
   const dueAt = input.dueAt ? new Date(input.dueAt) : null;
+  const escalateTo = input.escalateTo ?? null;
 
   try {
     const id = await prisma.$transaction(async (tx) => {
@@ -200,12 +215,14 @@ export async function createRequest(
         create: { name: 'request', value: 1 },
         update: { value: { increment: 1 } },
       });
-      const { assignedToId: _a, dueAt: _d, ...fields } = input;
+      const { assignedToId: _a, dueAt: _d, escalateTo: _e, ...fields } = input;
       const created = await tx.request.create({
         data: {
           ...fields,
           priority,
           dueAt,
+          escalateTo,
+          escalationById: escalateTo ? user.id : null,
           referenceNumber: formatReference(counter.value),
           priorityRank: PRIORITY_RANK[priority],
           assignedToId: assignee?.id ?? null,
@@ -223,6 +240,9 @@ export async function createRequest(
           newValue: formatDue(dueAt),
           description: `set the deadline to ${formatDue(dueAt)}`,
         });
+      }
+      if (escalateTo) {
+        entries.push(escalationEntry(null, escalateTo));
       }
       if (assignee) {
         entries.push({
@@ -298,6 +318,8 @@ export async function updateRequest(id: number, input: UpdateRequestInput, user:
       const next = input.dueAt === null ? null : new Date(input.dueAt);
       if ((next?.getTime() ?? null) !== (current.dueAt?.getTime() ?? null)) {
         data.dueAt = next;
+        // A new deadline gives the automatic priority rule a fresh chance to run.
+        data.escalatedAt = null;
         const before = formatDue(current.dueAt);
         const after = formatDue(next);
         entries.push({
@@ -312,6 +334,12 @@ export async function updateRequest(id: number, input: UpdateRequestInput, user:
               : `set the deadline to ${after}`,
         });
       }
+    }
+    if (input.escalateTo !== undefined && input.escalateTo !== current.escalateTo) {
+      data.escalateTo = input.escalateTo;
+      data.escalationById = input.escalateTo ? user.id : null;
+      data.escalatedAt = null;
+      entries.push(escalationEntry(current.escalateTo, input.escalateTo));
     }
     if (!entries.length) {
       if (current.version !== input.version) throw staleVersion();
@@ -433,6 +461,70 @@ export async function assignRequest(
     await log(tx, id, user.id, entries);
   });
   return getRequest(id, user);
+}
+
+function escalationEntry(before: Priority | null, after: Priority | null): LogEntry {
+  return {
+    actionType: 'UPDATED',
+    fieldName: 'escalateTo',
+    oldValue: before && PRIORITY_LABEL[before],
+    newValue: after && PRIORITY_LABEL[after],
+    description: after
+      ? `set the priority to rise to ${PRIORITY_LABEL[after]} in the last ${ESCALATION_HOURS} hours`
+      : 'turned off the automatic priority change',
+  };
+}
+
+/**
+ * Applies automatic priority rules: any unresolved request whose deadline is now under 24 hours
+ * away (or already past) rises to the priority its manager chose, once, and only ever upward.
+ * The change is recorded in the name of the manager who set the rule. Runs every minute.
+ */
+export async function runEscalations(now = new Date()) {
+  const due = await prisma.request.findMany({
+    where: {
+      escalateTo: { not: null },
+      escalatedAt: null,
+      status: { not: 'RESOLVED' },
+      dueAt: { not: null, lte: new Date(now.getTime() + ESCALATION_HOURS * 3600_000) },
+    },
+    select: {
+      id: true,
+      version: true,
+      priority: true,
+      escalateTo: true,
+      escalationById: true,
+      createdById: true,
+    },
+  });
+  let raised = 0;
+  for (const r of due) {
+    const target = r.escalateTo!;
+    const rises = PRIORITY_RANK[target] > PRIORITY_RANK[r.priority];
+    try {
+      await prisma.$transaction(async (tx) => {
+        await writeIfCurrent(tx, r.id, r.version, {
+          escalatedAt: now,
+          ...(rises && { priority: target, priorityRank: PRIORITY_RANK[target] }),
+        });
+        if (rises) {
+          await log(tx, r.id, r.escalationById ?? r.createdById, [
+            {
+              actionType: 'PRIORITY_CHANGED',
+              fieldName: 'priority',
+              oldValue: PRIORITY_LABEL[r.priority],
+              newValue: PRIORITY_LABEL[target],
+              description: `priority rose automatically from ${PRIORITY_LABEL[r.priority]} to ${PRIORITY_LABEL[target]} (under ${ESCALATION_HOURS} hours to the deadline)`,
+            },
+          ]);
+        }
+      });
+      if (rises) raised++;
+    } catch {
+      // Someone edited it at the same moment; the next run picks it up again.
+    }
+  }
+  return raised;
 }
 
 /** Used when a user is deactivated: release their unresolved work so nothing is stranded. */

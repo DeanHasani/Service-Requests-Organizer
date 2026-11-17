@@ -64,6 +64,7 @@ model User {
   assignedRequests Request[]     @relation("Assignee")
   createdRequests  Request[]     @relation("Creator")
   resolvedRequests Request[]     @relation("Resolver")
+  escalationRules  Request[]     @relation("Escalation")
   notes            RequestNote[]
   activities       ActivityLog[]
   sessions         Session[]
@@ -93,14 +94,21 @@ model Request {
   resolvedAt       DateTime?
   /// Deadline set by a manager.
   dueAt            DateTime?
+  /// Optional rule set by a manager: once the deadline is under 24 hours away, raise the
+  /// priority to this level (only ever upward). `escalatedAt` records that it has run.
+  escalateTo       Priority?
+  escalatedAt      DateTime?
+  /// The manager who set the rule; the automatic change is recorded in their name.
+  escalationById   Int?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  assignedTo User?         @relation("Assignee", fields: [assignedToId], references: [id], onDelete: Restrict)
-  createdBy  User          @relation("Creator", fields: [createdById], references: [id], onDelete: Restrict)
-  resolvedBy User?         @relation("Resolver", fields: [resolvedById], references: [id], onDelete: Restrict)
-  notes      RequestNote[]
-  activities ActivityLog[]
+  assignedTo   User?         @relation("Assignee", fields: [assignedToId], references: [id], onDelete: Restrict)
+  createdBy    User          @relation("Creator", fields: [createdById], references: [id], onDelete: Restrict)
+  resolvedBy   User?         @relation("Resolver", fields: [resolvedById], references: [id], onDelete: Restrict)
+  escalationBy User?         @relation("Escalation", fields: [escalationById], references: [id], onDelete: Restrict)
+  notes        RequestNote[]
+  activities   ActivityLog[]
 
   @@index([status])
   @@index([assignedToId, status])

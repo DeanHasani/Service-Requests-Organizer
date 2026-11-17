@@ -65,6 +65,8 @@ export const toRequest = (r: RequestRow): ServiceRequest => ({
   resolvedBy: r.resolvedBy,
   resolvedAt: r.resolvedAt?.toISOString() ?? null,
   dueAt: r.dueAt?.toISOString() ?? null,
+  escalateTo: r.escalateTo,
+  escalatedAt: r.escalatedAt?.toISOString() ?? null,
   createdAt: r.createdAt.toISOString(),
   updatedAt: r.updatedAt.toISOString(),
 });

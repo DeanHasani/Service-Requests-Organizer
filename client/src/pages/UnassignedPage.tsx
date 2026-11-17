@@ -7,8 +7,9 @@ import { useCurrentUser } from '../lib/auth';
 import { useAssignees, useRequests, useTriage } from '../lib/queries';
 import { ErrorState } from '../components/errors';
 import { UnassignedSkeleton } from '../components/skeletons';
-import { formatDate, formatDateTime, fromDateInput, timeAgo, toDateInput } from '../lib/format';
-import { Button, EmptyState, Input, PageHeader, Panel, Select } from '../components/ui';
+import { formatDate, formatDateTime, timeAgo } from '../lib/format';
+import { DeadlineInput, deadlineOf, deadlineToIso } from '../components/DeadlineInput';
+import { Button, EmptyState, PageHeader, Panel, Select } from '../components/ui';
 import { PriorityBadge, RequestRef, SourceLabel } from '../components/request-bits';
 import { Pagination } from './RequestsPage';
 
@@ -88,7 +89,7 @@ function ReviewRow({ request: r }: { request: ServiceRequest }) {
   const assignees = useAssignees();
   const triage = useTriage(r);
   const [priority, setPriority] = useState<Priority>(r.priority);
-  const [due, setDue] = useState(toDateInput(r.dueAt));
+  const [due, setDue] = useState(deadlineOf(r.dueAt));
   const [assignee, setAssignee] = useState('');
 
   return (
@@ -128,7 +129,7 @@ function ReviewRow({ request: r }: { request: ServiceRequest }) {
           if (!assignee) return;
           triage.mutate({
             priority,
-            dueAt: fromDateInput(due),
+            dueAt: deadlineToIso(due),
             assignedToId: Number(assignee),
           });
         }}
@@ -145,14 +146,11 @@ function ReviewRow({ request: r }: { request: ServiceRequest }) {
             </option>
           ))}
         </Select>
-        <Input
-          type="date"
-          aria-label={`Deadline for ${r.referenceNumber} (optional)`}
-          title="Deadline (optional)"
+        <DeadlineInput
+          label={`Deadline for ${r.referenceNumber}`}
           value={due}
-          min={toDateInput(new Date().toISOString())}
-          onChange={(e) => setDue(e.target.value)}
-          className="sm:w-40"
+          onChange={setDue}
+          className="col-span-2 sm:col-span-1 sm:w-[17rem]"
         />
         <Select
           aria-label={`Assignee for ${r.referenceNumber}`}

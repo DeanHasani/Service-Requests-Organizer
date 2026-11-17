@@ -53,11 +53,40 @@ export const toDateInput = (iso: string | null) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-/** A picked date means "by the end of that day", local time. Empty clears the deadline. */
-export const fromDateInput = (value: string): string | null => {
-  if (!value) return null;
-  const [y, m, d] = value.split('-').map(Number);
-  return new Date(y!, m! - 1, d!, 23, 59, 59, 999).toISOString();
+/** True for a deadline with no time picked, stored as the very end of that day (local time). */
+export const isEndOfDay = (iso: string) => {
+  const d = new Date(iso);
+  return d.getHours() === 23 && d.getMinutes() === 59 && d.getSeconds() === 59;
+};
+
+/** `HH:MM` in local time, for `<input type="time">`; empty when the deadline is end of day. */
+export const toTimeInput = (iso: string | null) => {
+  if (!iso || isEndOfDay(iso)) return '';
+  const d = new Date(iso);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+/**
+ * A deadline from the date and optional time inputs, local time. No time means "by the end of
+ * that day". No date clears the deadline.
+ */
+export const fromDateTimeInput = (date: string, time = ''): string | null => {
+  if (!date) return null;
+  const [y, m, d] = date.split('-').map(Number);
+  if (!time) return new Date(y!, m! - 1, d!, 23, 59, 59, 999).toISOString();
+  const [h, min] = time.split(':').map(Number);
+  return new Date(y!, m! - 1, d!, h!, min!, 0, 0).toISOString();
+};
+
+const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+/** Clock time of a deadline, or null when it is simply "end of day". */
+export const deadlineTime = (iso: string) =>
+  isEndOfDay(iso) ? null : timeFmt.format(new Date(iso));
+
+/** "20 Nov 2026" or "20 Nov 2026, 14:00". */
+export const formatDeadline = (iso: string) => {
+  const t = deadlineTime(iso);
+  return t ? `${formatDate(iso)}, ${t}` : formatDate(iso);
 };
 
 const DAY_MS = 86_400_000;
@@ -72,3 +101,20 @@ export const daysUntil = (iso: string, now = new Date()) => {
 /** "3.5 h" under a day, otherwise "2.1 days". */
 export const formatDuration = (hours: number) =>
   hours < 24 ? `${hours.toFixed(1)} h` : `${(hours / 24).toFixed(1)} days`;
+
+/** "2d 5h", "5h 12m" or "12m": the biggest two units, rounded down. */
+const span = (ms: number) => {
+  const min = Math.floor(ms / 60_000);
+  const d = Math.floor(min / 1440);
+  const h = Math.floor((min % 1440) / 60);
+  const m = min % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${Math.max(1, m)}m`;
+};
+
+/** "2d 5h left", or "Overdue by 3h 10m" once the deadline has passed. */
+export const formatCountdown = (iso: string, now = Date.now()) => {
+  const diff = new Date(iso).getTime() - now;
+  return diff > 0 ? `${span(diff)} left` : `Overdue by ${span(-diff)}`;
+};

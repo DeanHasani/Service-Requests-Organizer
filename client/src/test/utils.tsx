@@ -47,6 +47,8 @@ export const makeRequest = (over: Partial<ServiceRequest> = {}): ServiceRequest 
   resolvedBy: null,
   resolvedAt: null,
   dueAt: null,
+  escalateTo: null,
+  escalatedAt: null,
   createdAt: '2026-11-15T09:00:00.000Z',
   updatedAt: '2026-11-15T10:00:00.000Z',
   ...over,

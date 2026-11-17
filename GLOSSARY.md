@@ -12,7 +12,9 @@
 
 **Review queue (To review)**: open, unassigned requests waiting for a manager to set priority, deadline and owner. Employees cannot claim work; the manager assigns it.
 
-**Deadline**: the date a manager expects a request resolved by, end of day. Overdue means past it and not resolved.
+**Deadline**: when a manager expects a request resolved: a date, plus an optional time (no time means end of that day). Optional. Overdue means past it and not resolved. Requests show a live countdown to it.
+
+**Auto priority**: an optional rule a manager sets with a deadline: once the deadline is under 24 hours away, the priority rises to the level chosen (Normal, High or Urgent). It runs once, only raises, and is recorded in the history in the manager's name.
 
 **Temporary password**: a one-time password from a manager (on reset or for a new account). The holder must choose their own before using the app.
 

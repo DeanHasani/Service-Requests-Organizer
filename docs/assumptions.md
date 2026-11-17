@@ -34,6 +34,7 @@ Decisions where the brief was open:
 - Employees can reopen their own resolved requests if they find the fix did not hold.
 - Employees see the Team page with their manager set apart from their coworkers, so the hierarchy is clear. Coworkers' emails and insights stay private. Managers see their employees (other managers sit in a separate section) and open anyone's insights.
 - There is no email service, so passwords are not reset by email. A manager issues a one-time temporary password; the person must choose their own before they can do anything else, and every session they had is ended. New accounts work the same way. If no manager can sign in, `npm run user:reset-password -- <email>` on the server does the same. The last active manager cannot be deactivated.
+- Deadlines are optional: a date, plus an optional time (end of that day when left out). Forcing one on every request would produce made-up dates. A manager can also have the priority rise automatically in the last 24 hours before the deadline; a server check runs every minute, applies it once and never lowers a priority.
 - When someone leaves for good, a manager deactivates the account and can then delete it, confirming by typing the person's name. A deleted account can never sign in, leaves the team lists and frees its email, but its row is kept: every request, note and history entry still shows who did the work, and the account records when and by whom it was deleted. Nobody can delete their own account or the last manager.
 
 ## Request lifecycle

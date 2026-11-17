@@ -6,14 +6,16 @@ import { Info, Mail, MessageSquare, MoreHorizontal, Phone } from 'lucide-react';
 import {
   createRequestSchema,
   PRIORITIES,
+  ESCALATION_HOURS,
   PRIORITY_LABEL,
   type CreateRequestInput,
+  type Priority,
 } from '@deskflow/shared';
 import type { z } from 'zod';
 import { useCurrentUser } from '../lib/auth';
 import { useAssignees, useCreateRequest } from '../lib/queries';
 import { ApiError } from '../lib/api';
-import { fromDateInput, toDateInput } from '../lib/format';
+import { DeadlineInput, deadlineToIso, type Deadline } from '../components/DeadlineInput';
 import { Button, Field, Input, PageHeader, Panel, Select, Textarea } from '../components/ui';
 import { Segmented } from '../components/Segmented';
 import { ContactField } from '../components/ContactField';
@@ -45,6 +47,8 @@ export function NewRequestPage() {
   const create = useCreateRequest();
   // One idempotency key per form: a double click or a retry after a timeout cannot create a duplicate.
   const [clientRequestId] = useState(() => crypto.randomUUID());
+  const [deadline, setDeadline] = useState<Deadline>({ date: '', time: '' });
+  const [escalate, setEscalate] = useState<Priority | ''>('');
 
   const {
     register,
@@ -67,7 +71,15 @@ export function NewRequestPage() {
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      const r = await create.mutateAsync(values);
+      const r = await create.mutateAsync(
+        isEmployee
+          ? values
+          : {
+              ...values,
+              dueAt: deadlineToIso(deadline),
+              escalateTo: deadline.date && escalate ? escalate : null,
+            },
+      );
       navigate(`/requests/${r.id}`);
     } catch (err) {
       // Map server field errors back onto the form.
@@ -184,17 +196,33 @@ export function NewRequestPage() {
                   label="Deadline"
                   optional
                   error={errors.dueAt?.message}
-                  hint="Due by the end of that day."
+                  hint="Time is optional; without one it’s due by the end of that day."
                 >
-                  <Input
-                    id="dueAt"
-                    type="date"
-                    min={toDateInput(new Date().toISOString())}
-                    aria-invalid={!!errors.dueAt}
-                    {...register('dueAt', { setValueAs: (v) => fromDateInput(v ?? '') })}
-                  />
+                  <DeadlineInput id="dueAt" value={deadline} onChange={setDeadline} />
                 </Field>
               </div>
+              {deadline.date && (
+                <Field
+                  id="escalateTo"
+                  label={`In the last ${ESCALATION_HOURS} hours, raise priority to`}
+                  optional
+                  hint="Start it low and let it rise on its own as the deadline gets close."
+                >
+                  <Select
+                    id="escalateTo"
+                    value={escalate}
+                    onChange={(e) => setEscalate(e.target.value as Priority | '')}
+                    className="sm:max-w-xs"
+                  >
+                    <option value="">Keep as it is</option>
+                    {PRIORITIES.filter((p) => p !== 'LOW').map((p) => (
+                      <option key={p} value={p}>
+                        {PRIORITY_LABEL[p]}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
             </>
           )}
 

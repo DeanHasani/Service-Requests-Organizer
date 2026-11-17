@@ -171,7 +171,11 @@ export function AppShell() {
           onClick={() => setDrawer(true)}
           aria-label="Open menu"
           aria-expanded={drawer}
-          className="grid size-9 place-items-center rounded-md text-white hover:bg-navy-2"
+          // Hidden while the menu is open (it has its own close button); fades back after.
+          className={cx(
+            'grid size-9 place-items-center rounded-md text-white transition-[opacity,transform] duration-200 hover:bg-navy-2',
+            drawer ? 'pointer-events-none scale-90 opacity-0' : 'opacity-100',
+          )}
         >
           <Menu className="size-5" aria-hidden />
         </button>
