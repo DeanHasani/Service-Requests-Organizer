@@ -15,17 +15,26 @@ import {
 import type { Activity, ActionType } from '@deskflow/shared';
 import { formatDateTime, timeAgo, cx } from '../lib/format';
 
+// Every icon sits on a light slate tint. Neutral actions use the dark ink; the rest keep
+// their colour, in the deeper shade that reads on a light background.
+const ON_NAVY = {
+  neutral: 'text-navy-3',
+  blue: 'text-open',
+  orange: 'text-high',
+  amber: 'text-progress',
+  green: 'text-resolved',
+};
 const icon: Record<ActionType, { Icon: typeof CirclePlus; tone: string }> = {
-  CREATED: { Icon: CirclePlus, tone: 'text-open bg-open-soft' },
-  UPDATED: { Icon: PencilLine, tone: 'text-ink-2 bg-sunken' },
-  PRIORITY_CHANGED: { Icon: Flag, tone: 'text-high bg-high-soft' },
-  ASSIGNED: { Icon: UserPlus, tone: 'text-ink-2 bg-sunken' },
-  REASSIGNED: { Icon: ArrowRightLeft, tone: 'text-ink-2 bg-sunken' },
-  UNASSIGNED: { Icon: UserMinus, tone: 'text-ink-2 bg-sunken' },
-  STATUS_CHANGED: { Icon: PlayCircle, tone: 'text-progress bg-progress-soft' },
-  RESOLVED: { Icon: CheckCircle2, tone: 'text-resolved bg-resolved-soft' },
-  REOPENED: { Icon: RotateCcw, tone: 'text-open bg-open-soft' },
-  DEADLINE_CHANGED: { Icon: CalendarClock, tone: 'text-progress bg-progress-soft' },
+  CREATED: { Icon: CirclePlus, tone: ON_NAVY.blue },
+  UPDATED: { Icon: PencilLine, tone: ON_NAVY.neutral },
+  PRIORITY_CHANGED: { Icon: Flag, tone: ON_NAVY.orange },
+  ASSIGNED: { Icon: UserPlus, tone: ON_NAVY.neutral },
+  REASSIGNED: { Icon: ArrowRightLeft, tone: ON_NAVY.neutral },
+  UNASSIGNED: { Icon: UserMinus, tone: ON_NAVY.neutral },
+  STATUS_CHANGED: { Icon: PlayCircle, tone: ON_NAVY.amber },
+  RESOLVED: { Icon: CheckCircle2, tone: ON_NAVY.green },
+  REOPENED: { Icon: RotateCcw, tone: ON_NAVY.blue },
+  DEADLINE_CHANGED: { Icon: CalendarClock, tone: ON_NAVY.amber },
 };
 
 const refLink = (a: Activity) => (
@@ -57,7 +66,10 @@ function DescriptionWithLink({ activity: a }: { activity: Activity }) {
 }
 
 /** Field edits show the before/after values; descriptive actions already name them. */
-const showsValues = (a: Activity) => a.actionType === 'UPDATED' && a.fieldName !== 'description';
+/** Fields whose sentence already says what changed, so no before/after line underneath. */
+const SELF_DESCRIBED = new Set(['description', 'category', 'escalateTo']);
+const showsValues = (a: Activity) =>
+  a.actionType === 'UPDATED' && !SELF_DESCRIBED.has(a.fieldName ?? '');
 
 export function ActivityList({
   items,
@@ -85,7 +97,7 @@ export function ActivityList({
               )}
               <span
                 className={cx(
-                  'relative grid size-[27px] shrink-0 place-items-center rounded-full',
+                  'relative grid size-[27px] shrink-0 place-items-center rounded-full bg-navy-4/12',
                   tone,
                 )}
               >

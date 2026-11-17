@@ -20,6 +20,8 @@
   --color-navy: #0f1b2d;
   --color-navy-2: #18263c;
   --color-navy-3: #24344d;
+  /* Lighter slate for small chips on white: status pills, activity icons */
+  --color-navy-4: #3b4c69;
   --color-navy-ink: #c3cbd8;
   --color-navy-ink-dim: #8592a8;
 
@@ -38,9 +40,9 @@
   --color-resolved-dot: #3fa56f;
 
   /* Priority */
-  --color-urgent: #b32d24;
+  --color-urgent: #9a1f17;
   --color-urgent-soft: #fbe9e7;
-  --color-high: #a24a12;
+  --color-high: #bd5b10;
   --color-high-soft: #fbeee3;
 
   --radius-control: 6px;

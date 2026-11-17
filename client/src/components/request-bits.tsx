@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { CalendarClock, Check, Mail, MessageSquare, MoreHorizontal, Phone } from 'lucide-react';
+import {
+  CalendarClock,
+  Check,
+  Flag,
+  Mail,
+  MessageSquare,
+  MoreHorizontal,
+  Phone,
+} from 'lucide-react';
 import {
   PRIORITY_LABEL,
   SOURCE_LABEL,
@@ -19,56 +27,53 @@ import {
   formatShortDate,
 } from '../lib/format';
 
-const statusTone: Record<Status, { text: string; bg: string; dot: string }> = {
-  OPEN: { text: 'text-open', bg: 'bg-open-soft', dot: 'bg-open' },
-  IN_PROGRESS: { text: 'text-progress', bg: 'bg-progress-soft', dot: 'bg-progress-dot' },
-  RESOLVED: { text: 'text-resolved', bg: 'bg-resolved-soft', dot: 'bg-resolved-dot' },
+/** Dot colours for each status. */
+const statusDot: Record<Status, string> = {
+  OPEN: 'bg-open',
+  IN_PROGRESS: 'bg-progress-dot',
+  RESOLVED: 'bg-resolved-dot',
 };
 
+/** A thin border in the status colour, softened so it frames the pill without shouting. */
+const statusBorder: Record<Status, string> = {
+  OPEN: 'border-open/45',
+  IN_PROGRESS: 'border-progress-dot/60',
+  RESOLVED: 'border-resolved-dot/55',
+};
+
+/** A light slate tint with dark text; the dot and border carry the status colour. */
 export function StatusBadge({ status }: { status: Status }) {
-  const t = statusTone[status];
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
-        t.bg,
-        t.text,
+        'inline-flex items-center gap-1.5 rounded-full border bg-navy-4/12 px-2 py-px text-xs font-medium whitespace-nowrap text-ink',
+        statusBorder[status],
       )}
     >
-      <span aria-hidden className={cx('size-1.5 rounded-full', t.dot)} />
+      <span aria-hidden className={cx('size-1.5 rounded-full', statusDot[status])} />
       {STATUS_LABEL[status]}
     </span>
   );
 }
 
-/** Priority escalates by weight and colour; Low and Normal stay quiet so High and Urgent stand out. */
+/** Priority as a filled flag in its colour, next to the label in the same colour. */
+const priorityTone: Record<Priority, string> = {
+  LOW: 'text-open',
+  NORMAL: 'text-ink-2',
+  HIGH: 'text-high',
+  URGENT: 'text-urgent',
+};
+
 export function PriorityBadge({ priority }: { priority: Priority }) {
-  const bars = { LOW: 1, NORMAL: 2, HIGH: 3, URGENT: 4 }[priority];
-  const tone =
-    priority === 'URGENT'
-      ? 'text-urgent'
-      : priority === 'HIGH'
-        ? 'text-high'
-        : priority === 'NORMAL'
-          ? 'text-ink-2'
-          : 'text-ink-3';
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1.5 text-xs font-medium',
-        tone,
+        'inline-flex items-center gap-1 text-xs font-medium',
+        priorityTone[priority],
         priority === 'URGENT' && 'font-semibold',
       )}
     >
-      <span aria-hidden className="flex h-3 items-end gap-[2px]">
-        {[1, 2, 3, 4].map((i) => (
-          <span
-            key={i}
-            className={cx('w-[3px] rounded-[1px]', i <= bars ? 'bg-current' : 'bg-line-strong')}
-            style={{ height: `${4 + i * 2}px` }}
-          />
-        ))}
-      </span>
+      <Flag className="size-3.5 shrink-0" fill="currentColor" strokeWidth={1.75} aria-hidden />
       {PRIORITY_LABEL[priority]}
     </span>
   );
