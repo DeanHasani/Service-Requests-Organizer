@@ -30,7 +30,7 @@ const USERS = [
   { key: 'dean', name: 'Dean Hasani', email: 'dean@deskflow.test', role: 'EMPLOYEE' },
   { key: 'roman', name: 'Roman Max', email: 'roman@deskflow.test', role: 'EMPLOYEE' },
   { key: 'roxanne', name: 'Roxanne Keys', email: 'roxanne@deskflow.test', role: 'EMPLOYEE' },
-  { key: 'mira', name: 'Mira Shala', email: 'mira@deskflow.test', role: 'EMPLOYEE' },
+  { key: 'melissa', name: 'Melissa Lopez', email: 'melissa@deskflow.test', role: 'EMPLOYEE' },
   { key: 'theo', name: 'Theo Lang', email: 'theo@deskflow.test', role: 'EMPLOYEE' },
 ] as const;
 type Key = (typeof USERS)[number]['key'];
@@ -301,7 +301,7 @@ const REQUESTS: Seed[] = [
     by: 'roman',
     daysAgo: 2,
   },
-  // ----- added with Mira and Theo: work in flight that shows off deadlines and smart assignment
+  // ----- added with Melissa and Theo: work in flight that shows off deadlines and smart assignment
   {
     title: 'Boardroom air conditioning rattling loudly',
     description:
@@ -383,11 +383,14 @@ const REQUESTS: Seed[] = [
     priority: 'HIGH',
     status: 'IN_PROGRESS',
     by: 'manager',
-    to: 'mira',
+    to: 'melissa',
     daysAgo: 2,
     due: 52,
     notes: [
-      ['mira', 'Electrician booked for Thursday morning. Desks and monitor arms arrive Wednesday.'],
+      [
+        'melissa',
+        'Electrician booked for Thursday morning. Desks and monitor arms arrive Wednesday.',
+      ],
       ['manager', 'Please check the network points with Dean before Friday.'],
     ],
   },
@@ -401,7 +404,7 @@ const REQUESTS: Seed[] = [
     priority: 'NORMAL',
     status: 'OPEN',
     by: 'manager',
-    to: 'mira',
+    to: 'melissa',
     daysAgo: 1,
     due: 96,
   },
@@ -487,8 +490,8 @@ const REQUESTS: Seed[] = [
     category: 'FACILITIES',
     priority: 'NORMAL',
     status: 'RESOLVED',
-    by: 'mira',
-    to: 'mira',
+    by: 'melissa',
+    to: 'melissa',
     daysAgo: 3,
   },
   {
@@ -797,7 +800,7 @@ const PEOPLE: [string, string][] = [
   ['Grace Kim', 'ext. 118'],
 ];
 
-type Worker = 'dean' | 'roman' | 'roxanne' | 'mira' | 'theo';
+type Worker = 'dean' | 'roman' | 'roxanne' | 'melissa' | 'theo';
 /**
  * How each demo employee does in each category: how often they get that kind of work (weight),
  * how long they take against the typical time (speed, lower is faster), and how often a fix of
@@ -806,7 +809,7 @@ type Worker = 'dean' | 'roman' | 'roxanne' | 'mira' | 'theo';
  * - Dean: the network person (switches, VPN, Wi-Fi); slow and error-prone on building issues.
  * - Roman: hardware fixer (laptops, printers, peripherals); avoids software installs.
  * - Roxanne: accounts and access (onboarding, MFA, permissions), with software as a second skill.
- * - Mira: office operations (facilities, moves, events and errands), handy with hardware.
+ * - Melissa: office operations (facilities, moves, events and errands), handy with hardware.
  * - Theo: software and licences, the second-best on the network; not one for facilities.
  */
 const SKILL: Record<Worker, Record<Category, [weight: number, speed: number, reopen: number]>> = {
@@ -834,7 +837,7 @@ const SKILL: Record<Worker, Record<Category, [weight: number, speed: number, reo
     NETWORK: [0.8, 1.6, 0.3],
     OTHER: [1.5, 0.9, 0.05],
   },
-  mira: {
+  melissa: {
     FACILITIES: [7, 0.55, 0.03],
     OTHER: [5, 0.6, 0.04],
     HARDWARE: [2.5, 0.85, 0.08],
@@ -851,7 +854,7 @@ const SKILL: Record<Worker, Record<Category, [weight: number, speed: number, reo
     FACILITIES: [0.4, 1.6, 0.3],
   },
 };
-const WORKERS: Worker[] = ['dean', 'roman', 'roxanne', 'mira', 'theo'];
+const WORKERS: Worker[] = ['dean', 'roman', 'roxanne', 'melissa', 'theo'];
 /** Repeatable "random" number in [0, 1) for request k, so the seed is the same every time. */
 const noise = (k: number, salt: number) => {
   // mulberry32 step on a mixed seed: evenly spread, and the same every run.

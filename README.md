@@ -101,7 +101,7 @@ All six use the password `Deskflow!2026`, which comes from `SEED_PASSWORD`.
 | Dean Hasani    | dean@deskflow.test    | Employee |
 | Roman Max      | roman@deskflow.test   | Employee |
 | Roxanne Keys   | roxanne@deskflow.test | Employee |
-| Mira Shala     | mira@deskflow.test    | Employee |
+| Melissa Lopez  | melissa@deskflow.test | Employee |
 | Theo Lang      | theo@deskflow.test    | Employee |
 
 The seed adds 18 requests covering every status, priority and source, assigned and unassigned, with notes and history.

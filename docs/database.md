@@ -156,7 +156,7 @@ It also adds 160 resolved requests spread over four months so analytics and smar
 - **Dean**: network (switches, VPN, Wi-Fi); slow and error-prone on building issues
 - **Roman**: hardware (laptops, printers, peripherals); avoids software installs
 - **Roxanne**: accounts and access (onboarding, MFA, permissions), software second
-- **Mira**: office operations (facilities, moves, events, errands), handy with hardware
+- **Melissa**: office operations (facilities, moves, events, errands), handy with hardware
 - **Theo**: software and licences, second-best on the network; not one for facilities
 
 The current requests include unassigned work due soon (so smart assignment has something to suggest), a busy Dean (so workload balancing shows), and a mix of overdue, due-soon and on-track deadlines. History is keyed `…-9200-…` and replaces earlier versions (`…-9000-…`, `…-9100-…`).
