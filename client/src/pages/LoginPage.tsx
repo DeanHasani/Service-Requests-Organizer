@@ -106,6 +106,32 @@ function useDesktop() {
 const typedToTime = (typed: number) =>
   typed <= 0 ? 0 : SEG.line2[1] + (SEG.done[0] - SEG.line2[1]) * Math.min(typed / 0.85, 1);
 
+/**
+ * A radial glow that fades out along an eased curve instead of a straight line. A straight fade
+ * of a faint colour on a dark page shows visible rings (colour banding); easing the stops spreads
+ * those steps out so the edge melts away.
+ */
+function softGlow(shape: string, rgb: string, alpha: number, end = 70) {
+  const stops = [
+    [0, 1],
+    [0.18, 0.92],
+    [0.36, 0.72],
+    [0.52, 0.48],
+    [0.66, 0.27],
+    [0.8, 0.11],
+    [0.91, 0.03],
+    [1, 0],
+  ]
+    .map(([at, k]) => `rgb(${rgb} / ${(alpha * k!).toFixed(4)}) ${(at! * end).toFixed(1)}%`)
+    .join(', ');
+  return `radial-gradient(${shape}, ${stops})`;
+}
+
+/** Tiny tiled noise texture (SVG turbulence), used at very low opacity as film grain. */
+const GRAIN = `url("data:image/svg+xml,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>",
+)}")`;
+
 export function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
@@ -194,13 +220,19 @@ export function LoginPage() {
         style={{
           // Faint light in the three status colours, coming in from the screen edges.
           backgroundImage: [
-            'radial-gradient(38% 42% at 0% 8%, rgb(91 127 240 / 0.14), transparent 70%)',
-            'radial-gradient(34% 40% at 100% 48%, rgb(232 162 62 / 0.09), transparent 70%)',
-            'radial-gradient(40% 36% at 12% 100%, rgb(63 165 111 / 0.1), transparent 70%)',
-            'radial-gradient(50% 50% at 30% 40%, rgb(30 46 72 / 0.5), transparent 72%)',
+            softGlow('38% 42% at 0% 8%', '91 127 240', 0.14),
+            softGlow('34% 40% at 100% 48%', '232 162 62', 0.09),
+            softGlow('40% 36% at 12% 100%', '63 165 111', 0.1),
+            softGlow('50% 50% at 30% 40%', '30 46 72', 0.5, 72),
           ].join(','),
         }}
       >
+        {/* Very light film grain: dithers the faint gradients so they show no colour steps. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.3] mix-blend-soft-light"
+          style={{ backgroundImage: GRAIN, backgroundSize: '180px 180px' }}
+        />
         <motion.div
           className="grid w-full max-w-6xl gap-10 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-0"
           style={{ opacity: pageOpacity, scale: pageScale, filter: pageBlur }}
@@ -243,8 +275,11 @@ export function LoginPage() {
               aria-hidden
               className="pointer-events-none absolute -inset-14 -z-10 rounded-[48px] opacity-90 blur-3xl"
               style={{
-                backgroundImage:
-                  'radial-gradient(50% 45% at 20% 25%, rgb(91 127 240 / 0.28), transparent 70%), radial-gradient(45% 45% at 85% 50%, rgb(232 162 62 / 0.2), transparent 70%), radial-gradient(50% 45% at 40% 92%, rgb(63 165 111 / 0.26), transparent 70%)',
+                backgroundImage: [
+                  softGlow('50% 45% at 20% 25%', '91 127 240', 0.28),
+                  softGlow('45% 45% at 85% 50%', '232 162 62', 0.2),
+                  softGlow('50% 45% at 40% 92%', '63 165 111', 0.26),
+                ].join(','),
               }}
             />
             <ProgressCard
