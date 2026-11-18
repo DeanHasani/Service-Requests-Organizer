@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { changePasswordSchema } from '@deskflow/shared';
 import { useAuth } from '../lib/auth';
 import { ApiError, errorMessage } from '../lib/api';
-import { Button, Dialog, Field, Input } from './ui';
+import { Button, ConfirmDialog, Dialog, Field, Input } from './ui';
 
 /** The shared rules, plus a repeat of the new password typed in the browser. */
 const formSchema = z
@@ -27,12 +27,22 @@ export function ChangePasswordForm({
   currentLabel = 'Current password',
   submitLabel = 'Change password',
   onDone,
+  signOutEverywhere = false,
 }: {
   currentLabel?: string;
   submitLabel?: string;
   onDone?: () => void;
+  /**
+   * Profile: ask "are you sure?" first, then sign out on every device, this one included, so the
+   * new password is used everywhere from the next sign-in.
+   */
+  signOutEverywhere?: boolean;
 }) {
-  const { changePassword } = useAuth();
+  const { changePassword, logoutEverywhere } = useAuth();
+  const [pending, setPending] = useState<{ currentPassword: string; newPassword: string } | null>(
+    null,
+  );
+  const [saving, setSaving] = useState(false);
   const {
     register,
     handleSubmit,
@@ -44,20 +54,47 @@ export function ChangePasswordForm({
     defaultValues: { currentPassword: '', newPassword: '', confirm: '' },
   });
 
+  const showError = (err: unknown) => {
+    if (err instanceof ApiError && err.details?.currentPassword)
+      setError('currentPassword', { message: err.details.currentPassword[0] });
+    else if (err instanceof ApiError && err.details?.newPassword)
+      setError('newPassword', { message: err.details.newPassword[0] });
+    else setError('root', { message: errorMessage(err) });
+  };
+
   const onSubmit = handleSubmit(async ({ currentPassword, newPassword }) => {
+    if (signOutEverywhere) {
+      setPending({ currentPassword, newPassword });
+      return;
+    }
     try {
       await changePassword({ currentPassword, newPassword });
       reset();
       toast.success('Password changed. Other devices have been signed out.');
       onDone?.();
     } catch (err) {
-      if (err instanceof ApiError && err.details?.currentPassword)
-        setError('currentPassword', { message: err.details.currentPassword[0] });
-      else if (err instanceof ApiError && err.details?.newPassword)
-        setError('newPassword', { message: err.details.newPassword[0] });
-      else setError('root', { message: errorMessage(err) });
+      showError(err);
     }
   });
+
+  const confirmChange = async () => {
+    if (!pending) return;
+    setSaving(true);
+    try {
+      await changePassword(pending);
+    } catch (err) {
+      setSaving(false);
+      setPending(null);
+      showError(err);
+      return;
+    }
+    try {
+      await logoutEverywhere('Password changed. Sign in with your new password.');
+    } catch {
+      // The password is already changed and other devices are signed out; sign in again anyway.
+      window.location.assign('/login');
+    }
+  };
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
@@ -106,6 +143,17 @@ export function ChangePasswordForm({
           {submitLabel}
         </Button>
       </div>
+      {signOutEverywhere && (
+        <ConfirmDialog
+          open={pending !== null}
+          title="Change your password?"
+          body="You will be signed out on every device, this one included. Sign in again with your new password."
+          confirmLabel="Change and sign out"
+          loading={saving}
+          onConfirm={() => void confirmChange()}
+          onClose={() => !saving && setPending(null)}
+        />
+      )}
     </form>
   );
 }

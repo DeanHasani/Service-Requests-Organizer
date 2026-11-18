@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { LogOut, ShieldCheck } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { ChevronDown, KeyRound, LogOut, ShieldCheck } from 'lucide-react';
 import { ROLE_LABEL } from '@deskflow/shared';
 import { useAuth, useCurrentUser } from '../lib/auth';
 import { useInsights, useTeam } from '../lib/queries';
@@ -49,15 +50,55 @@ export function ProfilePage() {
 
       <h2 className="mt-8 mb-3 text-lg font-bold text-ink">Account</h2>
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
-        <Panel>
-          <PanelHeader title="Change password" />
-          <div className="p-4 sm:p-5">
-            <ChangePasswordForm />
-          </div>
-        </Panel>
+        <PasswordPanel />
         <SignOutEverywhere />
       </div>
     </>
+  );
+}
+
+/** Collapsed to one row; opens smoothly to the form when clicked. */
+function PasswordPanel() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Panel className="overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls="change-password-panel"
+        className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-canvas sm:px-5"
+      >
+        <KeyRound className="size-5 shrink-0 text-ink" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold text-ink">Change password</span>
+          <span className="block text-sm text-ink-2">
+            You will be signed out on every device afterwards.
+          </span>
+        </span>
+        <ChevronDown
+          className={`size-5 shrink-0 text-ink-2 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
+          aria-hidden
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            id="change-password-panel"
+            key="form"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-line p-4 sm:p-5">
+              <ChangePasswordForm signOutEverywhere />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Panel>
   );
 }
 

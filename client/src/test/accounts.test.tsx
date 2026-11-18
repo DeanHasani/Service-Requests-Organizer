@@ -169,6 +169,35 @@ describe('roles in the app', () => {
     renderApp('/profile');
     expect(await screen.findByText('Resolved in total')).toBeInTheDocument();
     expect(screen.getByText('1.3 days')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Change password', level: 2 })).toBeInTheDocument();
+    // Collapsed until clicked.
+    expect(screen.getByRole('button', { name: /Change password/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(screen.queryByLabelText('Current password')).toBeNull();
+  });
+
+  it('changes the password from the profile only after confirming, then signs out everywhere', async () => {
+    const { calls } = mockApi({
+      ...signedInAs(employee),
+      'GET /users/2/insights': { body: { data: insights(member({ id: 2, name: 'Dean Hasani' })) } },
+      'POST /auth/password': { body: { data: { user: employee, csrfToken: 'csrf-2' } } },
+      'POST /auth/logout-all': { status: 204 },
+    });
+    renderApp('/profile');
+    await userEvent.click(await screen.findByRole('button', { name: /Change password/ }));
+    await userEvent.type(await screen.findByLabelText('Current password'), 'old-password-1');
+    await userEvent.type(screen.getByLabelText('New password'), 'new-password-2');
+    await userEvent.type(screen.getByLabelText('Repeat new password'), 'new-password-2');
+    await userEvent.click(screen.getByRole('button', { name: 'Change password' }));
+
+    // Nothing is sent until the change is confirmed.
+    const dialog = await screen.findByRole('dialog', { name: 'Change your password?' });
+    expect(calls.some((c) => c.url.pathname === '/api/auth/password')).toBe(false);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Change and sign out' }));
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    const paths = calls.filter((c) => c.method === 'POST').map((c) => c.url.pathname);
+    expect(paths).toEqual(['/api/auth/password', '/api/auth/logout-all']);
   });
 });

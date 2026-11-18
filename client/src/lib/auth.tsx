@@ -14,7 +14,8 @@ type AuthValue = {
   login: (input: LoginInput) => Promise<User>;
   logout: () => Promise<void>;
   /** Signs this account out on every device, this one included. */
-  logoutEverywhere: () => Promise<void>;
+  /** Ends every session, this one included. `message` replaces the default toast. */
+  logoutEverywhere: (message?: string) => Promise<void>;
   /** Replaces the password; other devices are signed out, this session stays. */
   changePassword: (input: ChangePasswordInput) => Promise<User>;
 };
@@ -86,10 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           signOutLocally();
         }
       },
-      logoutEverywhere: async () => {
+      logoutEverywhere: async (message) => {
         await api.post('/auth/logout-all');
         signOutLocally();
-        toast.success('Signed out on every device');
+        toast.success(message ?? 'Signed out on every device');
       },
       changePassword: async (input) => {
         const s = await api.post<SessionInfo>('/auth/password', input);
