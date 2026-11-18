@@ -10,6 +10,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx --env-file-if-exists=.env prisma/seed.ts",
+    "db:demo": "tsx --env-file-if-exists=.env prisma/seed.ts --fresh",
     "db:reset": "prisma migrate reset --force",
     "test": "vitest run",
     "e2e:serve": "node tests/e2e-db.mjs && tsx src/index.ts",

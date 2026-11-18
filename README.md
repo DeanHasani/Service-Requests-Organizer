@@ -33,19 +33,23 @@ Requests used to live in personal notes and spreadsheets. Some were forgotten, s
 | -------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, React Router 7, TanStack Query, React Hook Form, Zod, Motion, Lucide, Sonner |
 | Backend  | Node.js, Express 5, TypeScript (run with `tsx`), Zod                                                                     |
-| Database | SQLite with Prisma 6 and Prisma Migrate                                                                                  |
+| Database | PostgreSQL (Supabase) with Prisma 6 and Prisma Migrate                                                                   |
 | Auth     | Server-side sessions in the database, bcrypt, HTTP-only cookies, CSRF token, rate-limited login                          |
 | Tests    | Vitest, Supertest, React Testing Library, Playwright                                                                     |
 | Tooling  | npm workspaces, strict TypeScript, ESLint, Prettier                                                                      |
 
 Architecture and decisions: [docs/architecture.md](docs/architecture.md). Data model: [docs/database.md](docs/database.md). Assumptions: [docs/assumptions.md](docs/assumptions.md). Tests and results: [docs/testing.md](docs/testing.md).
 
+## Live demo
+
+https://deskflow-org.vercel.app (Vercel + Supabase; same demo accounts). How it is deployed: [docs/deployment.md](docs/deployment.md).
+
 ## Requirements
 
 - Node.js 20.19 or newer (developed on Node 25)
 - npm 10 or newer
 
-Nothing else: SQLite is a file, so there is no database server to install.
+- A PostgreSQL database. The project uses a free Supabase project; local dev, tests and the live site each use their own schema in it (see [docs/deployment.md](docs/deployment.md)).
 
 ## Setup
 
@@ -54,7 +58,7 @@ git clone https://github.com/DeanHasani/Service-Requests-Organizer.git
 cd Service-Requests-Organizer
 
 npm install                              # installs all three workspaces
-cp server/.env.example server/.env       # Windows: copy server\.env.example server\.env
+cp server/.env.example server/.env       # Windows: copy server\.env.example server\.env; then fill in the database URLs
 npm run setup                            # applies migrations, then seeds demo data
 npm run dev                              # API on :4000, web app on :5173
 ```
@@ -63,28 +67,33 @@ Open http://localhost:5173 and sign in with a demo account.
 
 ### Environment variables (`server/.env`)
 
-| Variable            | Default         | Purpose                                          |
-| ------------------- | --------------- | ------------------------------------------------ |
-| `DATABASE_URL`      | `file:./dev.db` | SQLite file, relative to `server/prisma/`        |
-| `PORT`              | `4000`          | API port                                         |
-| `NODE_ENV`          | `development`   | `production` turns on `Secure` cookies           |
-| `SESSION_TTL_HOURS` | `8`             | Session lifetime; it slides forward while in use |
-| `LOGIN_RATE_LIMIT`  | `10`            | Failed sign-ins allowed per IP per 15 minutes    |
-| `SEED_PASSWORD`     | `Deskflow!2026` | Password the seed gives every demo account       |
+| Variable             | Default         | Purpose                                                     |
+| -------------------- | --------------- | ----------------------------------------------------------- |
+| `DATABASE_URL`       | (required)      | Postgres connection used by the app (`?schema=dev` locally) |
+| `DIRECT_URL`         | (required)      | Postgres connection used by migrations                      |
+| `TEST_DATABASE_BASE` | (for tests)     | Postgres connection the test suites add their own schema to |
+| `CRON_SECRET`        | (unset)         | Secret for `/api/cron/*`; unset turns those endpoints off   |
+| `TRUST_PROXY`        | `loopback`      | Express `trust proxy`; `1` behind Vercel                    |
+| `PORT`               | `4000`          | API port                                                    |
+| `NODE_ENV`           | `development`   | `production` turns on `Secure` cookies                      |
+| `SESSION_TTL_HOURS`  | `8`             | Session lifetime; it slides forward while in use            |
+| `LOGIN_RATE_LIMIT`   | `10`            | Failed sign-ins allowed per IP per 15 minutes               |
+| `SEED_PASSWORD`      | `Deskflow!2026` | Password the seed gives every demo account                  |
 
 ## Database commands
 
-| Command                            | What it does                                                          |
-| ---------------------------------- | --------------------------------------------------------------------- |
-| `npm run db:migrate`               | Applies pending migrations (`prisma migrate deploy`). Safe to rerun.  |
-| `npm run db:seed`                  | Adds demo users and requests. Idempotent: rerunning adds nothing new. |
-| `npm run setup`                    | Both of the above.                                                    |
-| `npm run db:migrate:dev -w server` | Creates a new migration after a schema change (development only).     |
-| `npm run db:reset`                 | Deletes all data in `dev.db`, reapplies migrations and reseeds.       |
+| Command                            | What it does                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run db:migrate`               | Applies pending migrations (`prisma migrate deploy`). Safe to rerun.                                                                                    |
+| `npm run db:seed`                  | Adds demo users and requests. Idempotent: rerunning adds nothing new.                                                                                   |
+| `npm run db:demo`                  | Presentation reset: removes ALL requests, history, notifications, sessions and non-demo accounts, then seeds the demo story with dates relative to now. |
+| `npm run setup`                    | Both of the above.                                                                                                                                      |
+| `npm run db:migrate:dev -w server` | Creates a new migration after a schema change (development only).                                                                                       |
+| `npm run db:reset`                 | Deletes all data in the `DATABASE_URL` schema, reapplies migrations and reseeds.                                                                        |
 
 ## Demo accounts
 
-All four use the password `Deskflow!2026`, which comes from `SEED_PASSWORD`.
+All six use the password `Deskflow!2026`, which comes from `SEED_PASSWORD`.
 
 | Name           | Email                 | Role     |
 | -------------- | --------------------- | -------- |
@@ -92,6 +101,8 @@ All four use the password `Deskflow!2026`, which comes from `SEED_PASSWORD`.
 | Dean Hasani    | dean@deskflow.test    | Employee |
 | Roman Max      | roman@deskflow.test   | Employee |
 | Roxanne Keys   | roxanne@deskflow.test | Employee |
+| Mira Shala     | mira@deskflow.test    | Employee |
+| Theo Lang      | theo@deskflow.test    | Employee |
 
 The seed adds 18 requests covering every status, priority and source, assigned and unassigned, with notes and history.
 

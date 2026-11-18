@@ -1,14 +1,11 @@
 import { execSync } from 'node:child_process';
-import { rmSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { testDatabaseUrl } from './db-url.mjs';
 
-// The suite owns this throwaway file: start from an empty DB and apply migrations.
-const dbFile = fileURLToPath(new URL('../prisma/test.db', import.meta.url));
-
+// The suite owns the "test" schema: wipe it and apply migrations before every run.
 export default function setup() {
-  for (const f of [dbFile, `${dbFile}-journal`]) rmSync(f, { force: true });
-  execSync('npx prisma migrate deploy', {
+  const url = testDatabaseUrl('test');
+  execSync('npx prisma migrate reset --force --skip-seed --skip-generate', {
     stdio: 'pipe',
-    env: { ...process.env, DATABASE_URL: 'file:./test.db', PRISMA_HIDE_UPDATE_MESSAGE: '1' },
+    env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url, PRISMA_HIDE_UPDATE_MESSAGE: '1' },
   });
 }

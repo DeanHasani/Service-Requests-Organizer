@@ -1,6 +1,10 @@
 /**
  * Idempotent demo seed. Users are upserted by email; requests are keyed by a fixed
  * clientRequestId and skipped if they already exist, so re-running never duplicates.
+ *
+ * `--fresh` (npm run db:demo -w server) first removes ALL requests, notes, history,
+ * notifications and sessions, and any account that is not a demo account, then seeds again, so
+ * the data is exactly the demo story with dates relative to now. Use it before a presentation.
  */
 import bcrypt from 'bcryptjs';
 import {
@@ -15,6 +19,7 @@ import { formatReference, PRIORITY_LABEL, STATUS_LABEL } from '@deskflow/shared'
 
 const prisma = new PrismaClient();
 const PASSWORD = process.env.SEED_PASSWORD;
+const FRESH = process.argv.includes('--fresh');
 if (!PASSWORD || PASSWORD.length < 8) {
   console.error('Set SEED_PASSWORD (min 8 chars) in server/.env before seeding.');
   process.exit(1);
@@ -25,6 +30,8 @@ const USERS = [
   { key: 'dean', name: 'Dean Hasani', email: 'dean@deskflow.test', role: 'EMPLOYEE' },
   { key: 'roman', name: 'Roman Max', email: 'roman@deskflow.test', role: 'EMPLOYEE' },
   { key: 'roxanne', name: 'Roxanne Keys', email: 'roxanne@deskflow.test', role: 'EMPLOYEE' },
+  { key: 'mira', name: 'Mira Shala', email: 'mira@deskflow.test', role: 'EMPLOYEE' },
+  { key: 'theo', name: 'Theo Lang', email: 'theo@deskflow.test', role: 'EMPLOYEE' },
 ] as const;
 type Key = (typeof USERS)[number]['key'];
 
@@ -61,6 +68,10 @@ type Seed = {
   to?: Key;
   daysAgo: number;
   notes?: [Key, string][];
+  /** Category, when the title is not in CATEGORY_BY_TITLE. */
+  category?: Category;
+  /** Deadline in hours from now (negative: already overdue). Overrides the default rule. */
+  due?: number;
 };
 
 const REQUESTS: Seed[] = [
@@ -290,18 +301,238 @@ const REQUESTS: Seed[] = [
     by: 'roman',
     daysAgo: 2,
   },
+  // ----- added with Mira and Theo: work in flight that shows off deadlines and smart assignment
+  {
+    title: 'Boardroom air conditioning rattling loudly',
+    description:
+      'The AC unit above the boardroom table started rattling this morning. The board meets there tomorrow at 9:00 with external guests.',
+    requester: ['Executive assistant', 'ext. 301'],
+    source: 'PHONE',
+    category: 'FACILITIES',
+    priority: 'HIGH',
+    status: 'OPEN',
+    by: 'manager',
+    daysAgo: 0,
+    due: 14,
+  },
+  {
+    title: 'CRM add-on fails to install on sales laptops',
+    description:
+      'The new quoting add-on for the CRM stops at 80% with error 0x80070643 on three sales laptops. Sales want it before the pricing launch.',
+    requester: ['Tom Becker', 'tom.becker@northwind.example'],
+    source: 'EMAIL',
+    category: 'SOFTWARE',
+    priority: 'NORMAL',
+    status: 'OPEN',
+    by: 'manager',
+    daysAgo: 0,
+    due: 20,
+  },
+  {
+    title: 'Guest Wi-Fi for client workshop on Friday',
+    description:
+      'Twenty guests from a client attend a workshop in the training room. They need a separate guest network with a printed voucher per person.',
+    requester: ['Grace Kim', 'ext. 118'],
+    source: 'MESSAGE',
+    category: 'NETWORK',
+    priority: 'HIGH',
+    status: 'OPEN',
+    by: 'manager',
+    daysAgo: 1,
+    due: 30,
+  },
+  {
+    title: 'Smart card printer out of ribbon',
+    description:
+      'The badge printer at reception shows "ribbon empty". Two new starters need badges next week.',
+    requester: ['Reception', 'ext. 100'],
+    source: 'MESSAGE',
+    category: 'HARDWARE',
+    priority: 'LOW',
+    status: 'OPEN',
+    by: 'roxanne',
+    daysAgo: 1,
+  },
+  {
+    title: 'Core switch fan alarm in comms room',
+    description:
+      'The core switch reports a fan failure and its temperature is climbing. If it overheats, the whole office loses the network.',
+    requester: ['Monitoring alert', 'noc@northwind.example'],
+    source: 'OTHER',
+    category: 'NETWORK',
+    priority: 'URGENT',
+    status: 'IN_PROGRESS',
+    by: 'manager',
+    to: 'dean',
+    daysAgo: 0,
+    due: 5,
+    notes: [
+      [
+        'dean',
+        'Spare fan module is in the store room. Swapping it during lunch to keep the outage short.',
+      ],
+    ],
+  },
+  {
+    title: 'Office move: set up six desks on the 4th floor',
+    description:
+      'Customer Success moves upstairs on Monday. Six desks need power, network points tested, monitors mounted and the floor plan updated.',
+    requester: ['Ivana Novak (HR)', 'hr@northwind.example'],
+    source: 'EMAIL',
+    category: 'FACILITIES',
+    priority: 'HIGH',
+    status: 'IN_PROGRESS',
+    by: 'manager',
+    to: 'mira',
+    daysAgo: 2,
+    due: 52,
+    notes: [
+      ['mira', 'Electrician booked for Thursday morning. Desks and monitor arms arrive Wednesday.'],
+      ['manager', 'Please check the network points with Dean before Friday.'],
+    ],
+  },
+  {
+    title: 'Book AV equipment for the quarterly town hall',
+    description:
+      'Two wireless microphones, the portable speaker and a livestream camera for the town hall in the canteen.',
+    requester: ['Laura Bennett', 'laura.bennett@northwind.example'],
+    source: 'EMAIL',
+    category: 'OTHER',
+    priority: 'NORMAL',
+    status: 'OPEN',
+    by: 'manager',
+    to: 'mira',
+    daysAgo: 1,
+    due: 96,
+  },
+  {
+    title: 'Power BI licences for the finance analysts',
+    description:
+      'Three analysts need Power BI Pro to share the new cash-flow dashboard. Check whether the unused Visio licences can be swapped.',
+    requester: ['Peter Hall', 'peter.hall@northwind.example'],
+    source: 'EMAIL',
+    category: 'SOFTWARE',
+    priority: 'NORMAL',
+    status: 'IN_PROGRESS',
+    by: 'theo',
+    to: 'theo',
+    daysAgo: 1,
+    due: 44,
+    notes: [['theo', 'Two Visio licences are unused. Asked the vendor to swap them for Power BI.']],
+  },
+  {
+    title: 'Payroll portal single sign-on error',
+    description:
+      'Staff in the warehouse get "SAML response not valid" when opening the payroll portal. Payslips go out on Friday.',
+    requester: ['Marco Silva', 'ext. 214'],
+    source: 'PHONE',
+    category: 'ACCESS',
+    priority: 'HIGH',
+    status: 'IN_PROGRESS',
+    by: 'manager',
+    to: 'roxanne',
+    daysAgo: 1,
+    due: 9,
+    notes: [
+      [
+        'roxanne',
+        'The signing certificate expired yesterday. Uploading the new one with the vendor now.',
+      ],
+    ],
+  },
+  {
+    title: 'Replace cracked laptop screen',
+    description: 'Screen cracked in transit. The laptop still works with an external monitor.',
+    requester: ['Priya Nair', '+44 20 7946 0321'],
+    source: 'PHONE',
+    category: 'HARDWARE',
+    priority: 'NORMAL',
+    status: 'OPEN',
+    by: 'manager',
+    to: 'roman',
+    daysAgo: 1,
+    due: 100,
+  },
+  {
+    title: 'Shared mailbox for Procurement',
+    description:
+      'Procurement wants procurement@ as a shared mailbox for four people, with send-as rights.',
+    requester: ['Peter Hall', 'peter.hall@northwind.example'],
+    source: 'EMAIL',
+    category: 'ACCESS',
+    priority: 'NORMAL',
+    status: 'OPEN',
+    by: 'manager',
+    to: 'theo',
+    daysAgo: 2,
+    due: -3,
+  },
+  {
+    title: 'Email signature template for Marketing',
+    description: 'New brand colours: update the Outlook signature template for the marketing team.',
+    requester: ['Peter Hall', 'peter.hall@northwind.example'],
+    source: 'EMAIL',
+    category: 'SOFTWARE',
+    priority: 'LOW',
+    status: 'RESOLVED',
+    by: 'manager',
+    to: 'theo',
+    daysAgo: 4,
+  },
+  {
+    title: 'Parking barrier remote not working',
+    description: 'The remote for the car park barrier stopped working for the delivery van.',
+    requester: ['Facilities desk', 'ext. 150'],
+    source: 'PHONE',
+    category: 'FACILITIES',
+    priority: 'NORMAL',
+    status: 'RESOLVED',
+    by: 'mira',
+    to: 'mira',
+    daysAgo: 3,
+  },
+  {
+    title: 'Move printer to the new HR office',
+    description:
+      'HR moved rooms. Their printer needs moving, a new network point and the queue updated on their laptops.',
+    requester: ['Ivana Novak (HR)', 'hr@northwind.example'],
+    source: 'MESSAGE',
+    category: 'HARDWARE',
+    priority: 'NORMAL',
+    status: 'OPEN',
+    by: 'manager',
+    daysAgo: 0,
+  },
 ];
 
 const RANK: Record<Priority, number> = { LOW: 0, NORMAL: 1, HIGH: 2, URGENT: 3 };
 const HOUR = 3600_000;
 
+/** --fresh: remove everything except the demo accounts, so only the demo story remains. */
+async function wipe() {
+  const demo = USERS.map((u) => u.email);
+  await prisma.$transaction([
+    prisma.notification.deleteMany({}),
+    prisma.activityLog.deleteMany({}),
+    prisma.requestNote.deleteMany({}),
+    prisma.request.deleteMany({}),
+    prisma.session.deleteMany({}),
+    prisma.user.deleteMany({ where: { email: { notIn: demo } } }),
+    prisma.counter.deleteMany({}),
+  ]);
+}
+
 async function main() {
+  if (FRESH) await wipe();
   const passwordHash = await bcrypt.hash(PASSWORD!, 12);
   const ids = {} as Record<Key, { id: number; name: string }>;
   for (const u of USERS) {
     const row = await prisma.user.upsert({
       where: { email: u.email },
-      update: {},
+      // Fresh: put demo accounts back exactly as described (password, role, active).
+      update: FRESH
+        ? { name: u.name, role: u.role, passwordHash, isActive: true, mustChangePassword: false }
+        : {},
       create: { name: u.name, email: u.email, role: u.role, passwordHash },
     });
     ids[u.key] = { id: row.id, name: row.name };
@@ -333,10 +564,13 @@ async function main() {
             ? at(0.25)
             : t0;
       // Managers set a deadline when they assign work: sooner for more urgent requests.
-      const dueAt =
-        assignee && !resolved
-          ? at(24 * { URGENT: 1, HIGH: 3, NORMAL: 7, LOW: 14 }[s.priority])
-          : null;
+      const dueAt = resolved
+        ? null
+        : s.due !== undefined
+          ? new Date(Date.now() + s.due * HOUR)
+          : assignee
+            ? at(24 * { URGENT: 1, HIGH: 3, NORMAL: 7, LOW: 14 }[s.priority])
+            : null;
 
       const req = await tx.request.create({
         data: {
@@ -347,7 +581,7 @@ async function main() {
           requesterName: s.requester[0],
           requesterContact: s.requester[1],
           source: s.source,
-          category: CATEGORY_BY_TITLE[s.title] ?? 'OTHER',
+          category: s.category ?? CATEGORY_BY_TITLE[s.title] ?? 'OTHER',
           priority: s.priority,
           priorityRank: RANK[s.priority],
           status: s.status,
@@ -475,36 +709,60 @@ const HISTORY_TITLES: Record<Category, string[]> = {
     'Replace broken headset',
     'Second monitor not detected',
     'Printer jams on double-sided jobs',
+    'Laptop battery swelling',
+    'Barcode scanner not reading labels',
+    'Replace worn keyboard at reception',
+    'Set up new laptop for transfer',
   ],
   SOFTWARE: [
     'Outlook keeps asking for password',
     'Install design tools for new starter',
     'Excel crashes when opening large file',
     'Teams camera not working after update',
+    'Renew project management licences',
+    'PDF editor missing after reimage',
+    'Accounting software update fails',
+    'Browser extension blocked by policy',
   ],
   NETWORK: [
     'Slow connection on 3rd floor',
     'Guest Wi-Fi password not working',
     'Cannot reach shared drive from home',
     'Network port dead at desk 31',
+    'VPN drops every 20 minutes',
+    'Wi-Fi dead zone in warehouse office',
+    'Firewall rule for supplier portal',
+    'Replace faulty patch cable in comms room',
   ],
   ACCESS: [
     'Reset password for warehouse account',
     'Add user to Sales distribution list',
     'Remove access for leaver',
     'Grant read access to HR folder',
+    'Unlock account after failed sign-ins',
+    'MFA reset for new phone',
+    'Contractor access to project site',
+    'Mailbox delegation for assistant',
   ],
   FACILITIES: [
     'Heating not working in meeting room A',
     'Replace light in corridor',
     'Fix lock on storage cupboard',
     'Kitchen dishwasher leaking',
+    'Blinds stuck in meeting room C',
+    'Water cooler needs servicing',
+    'Door access fob for new starter',
+    'Rearrange desks for team move',
   ],
   OTHER: [
     'Recover file from last week backup',
     'Book equipment for town hall',
     'Label cables in comms room',
     'Archive old project mailboxes',
+    'Order welcome kit for new starters',
+    'Set up room for training day',
+    'Collect old laptops for recycling',
+    'Arrange courier for returned devices',
   ],
 };
 /** Typical hours to resolve, so the categories differ the way they would in real life. */
@@ -516,17 +774,19 @@ const TYPICAL_HOURS: Record<Category, number> = {
   FACILITIES: 72,
   OTHER: 12,
 };
-const HISTORY_COUNT = 90;
+const HISTORY_COUNT = 160;
 const HISTORY_CATEGORIES: Category[] = [
   'SOFTWARE',
   'HARDWARE',
   'ACCESS',
   'NETWORK',
-  'SOFTWARE',
   'FACILITIES',
-  'HARDWARE',
+  'SOFTWARE',
   'OTHER',
+  'HARDWARE',
   'ACCESS',
+  'NETWORK',
+  'FACILITIES',
   'SOFTWARE',
 ];
 const PEOPLE: [string, string][] = [
@@ -537,49 +797,74 @@ const PEOPLE: [string, string][] = [
   ['Grace Kim', 'ext. 118'],
 ];
 
-type Worker = 'dean' | 'roman' | 'roxanne';
+type Worker = 'dean' | 'roman' | 'roxanne' | 'mira' | 'theo';
 /**
  * How each demo employee does in each category: how often they get that kind of work (weight),
  * how long they take against the typical time (speed, lower is faster), and how often a fix of
- * theirs gets reopened. Dean is strongest on Network, Roman on Hardware and Facilities, Roxanne
- * on Account access and Software, and each has a weak spot, so smart assignment has something
- * real to tell apart.
+ * theirs gets reopened. Each has a clear story, so smart assignment has something real to tell
+ * apart:
+ * - Dean: the network person (switches, VPN, Wi-Fi); slow and error-prone on building issues.
+ * - Roman: hardware fixer (laptops, printers, peripherals); avoids software installs.
+ * - Roxanne: accounts and access (onboarding, MFA, permissions), with software as a second skill.
+ * - Mira: office operations (facilities, moves, events and errands), handy with hardware.
+ * - Theo: software and licences, the second-best on the network; not one for facilities.
  */
 const SKILL: Record<Worker, Record<Category, [weight: number, speed: number, reopen: number]>> = {
   dean: {
-    NETWORK: [6, 0.6, 0.03],
-    SOFTWARE: [3, 0.85, 0.08],
+    NETWORK: [7, 0.55, 0.03],
+    SOFTWARE: [2, 0.9, 0.08],
     HARDWARE: [1.5, 1, 0.1],
     ACCESS: [1, 1.3, 0.2],
-    FACILITIES: [1, 1.4, 0.25],
-    OTHER: [2, 1, 0.08],
+    FACILITIES: [0.5, 1.4, 0.25],
+    OTHER: [1.5, 1, 0.08],
   },
   roman: {
-    HARDWARE: [6, 0.65, 0.04],
-    FACILITIES: [4, 0.8, 0.08],
+    HARDWARE: [7, 0.6, 0.04],
+    FACILITIES: [2.5, 0.9, 0.08],
     NETWORK: [1.5, 1.1, 0.12],
     ACCESS: [1, 1, 0.1],
-    SOFTWARE: [1, 1.5, 0.3],
-    OTHER: [2, 1, 0.1],
+    SOFTWARE: [0.8, 1.5, 0.3],
+    OTHER: [1.5, 1, 0.1],
   },
   roxanne: {
-    ACCESS: [6, 0.5, 0.02],
-    SOFTWARE: [4, 0.75, 0.06],
-    FACILITIES: [1, 1.1, 0.1],
+    ACCESS: [7, 0.5, 0.02],
+    SOFTWARE: [2.5, 0.85, 0.06],
+    FACILITIES: [0.8, 1.1, 0.1],
     HARDWARE: [1, 1.3, 0.2],
-    NETWORK: [1, 1.6, 0.3],
-    OTHER: [2, 0.9, 0.05],
+    NETWORK: [0.8, 1.6, 0.3],
+    OTHER: [1.5, 0.9, 0.05],
+  },
+  mira: {
+    FACILITIES: [7, 0.55, 0.03],
+    OTHER: [5, 0.6, 0.04],
+    HARDWARE: [2.5, 0.85, 0.08],
+    ACCESS: [1, 1.1, 0.1],
+    SOFTWARE: [0.7, 1.4, 0.25],
+    NETWORK: [0.5, 1.7, 0.3],
+  },
+  theo: {
+    SOFTWARE: [7, 0.5, 0.03],
+    NETWORK: [3, 0.8, 0.06],
+    ACCESS: [2, 0.9, 0.08],
+    HARDWARE: [1, 1.2, 0.15],
+    OTHER: [1, 1, 0.1],
+    FACILITIES: [0.4, 1.6, 0.3],
   },
 };
-const WORKERS: Worker[] = ['dean', 'roman', 'roxanne'];
+const WORKERS: Worker[] = ['dean', 'roman', 'roxanne', 'mira', 'theo'];
 /** Repeatable "random" number in [0, 1) for request k, so the seed is the same every time. */
 const noise = (k: number, salt: number) => {
-  const x = Math.sin((k + 1) * 12.9898 + salt * 78.233) * 43758.5453;
-  return x - Math.floor(x);
+  // mulberry32 step on a mixed seed: evenly spread, and the same every run.
+  let t = (Math.imul(k + 1, 2654435761) ^ Math.imul(salt + 1, 974711)) >>> 0;
+  t = (t + 0x6d2b79f5) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 
-const OLD_HISTORY_PREFIX = '00000000-0000-4000-9000-';
-const HISTORY_PREFIX = '00000000-0000-4000-9100-';
+/** Earlier versions of the demo history, replaced when found. */
+const OLD_HISTORY_PREFIXES = ['00000000-0000-4000-9000-', '00000000-0000-4000-9100-'];
+const HISTORY_PREFIX = '00000000-0000-4000-9200-';
 
 /**
  * Resolved requests spread over the last four months, keyed like the main seed so re-running
@@ -589,12 +874,13 @@ const HISTORY_PREFIX = '00000000-0000-4000-9100-';
  */
 async function seedHistory(ids: Record<Key, { id: number; name: string }>) {
   const old = await prisma.request.findMany({
-    where: { clientRequestId: { startsWith: OLD_HISTORY_PREFIX } },
+    where: { OR: OLD_HISTORY_PREFIXES.map((p) => ({ clientRequestId: { startsWith: p } })) },
     select: { id: true },
   });
   if (old.length) {
     const oldIds = old.map((o) => o.id);
     await prisma.$transaction([
+      prisma.notification.deleteMany({ where: { requestId: { in: oldIds } } }),
       prisma.activityLog.deleteMany({ where: { requestId: { in: oldIds } } }),
       prisma.requestNote.deleteMany({ where: { requestId: { in: oldIds } } }),
       prisma.request.deleteMany({ where: { id: { in: oldIds } } }),

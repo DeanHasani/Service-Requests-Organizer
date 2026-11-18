@@ -1,9 +1,12 @@
 import { defineConfig } from 'vitest/config';
+import { testDatabaseUrl } from './tests/db-url.mjs';
 
-// Isolated SQLite file; global setup rebuilds it from migrations before every run.
+// Isolated Postgres schema ("test"); global setup rebuilds it from migrations before every run.
+const url = testDatabaseUrl('test');
 const env = {
   NODE_ENV: 'test',
-  DATABASE_URL: 'file:./test.db',
+  DATABASE_URL: url,
+  DIRECT_URL: url,
   SESSION_TTL_HOURS: '8',
   LOGIN_RATE_LIMIT: '1000',
 };
@@ -13,7 +16,7 @@ export default defineConfig({
     env,
     globalSetup: './tests/global-setup.ts',
     fileParallelism: false,
-    testTimeout: 20_000,
-    hookTimeout: 60_000,
+    testTimeout: 30_000,
+    hookTimeout: 120_000,
   },
 });

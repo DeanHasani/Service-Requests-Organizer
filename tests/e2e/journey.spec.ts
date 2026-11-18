@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { expect, request, test, type Page } from '@playwright/test';
+import { testDatabaseUrl } from '../../server/tests/db-url.mjs';
 
 const PASSWORD = 'Deskflow!2026';
 const TITLE = `Docking station not detecting monitors ${Date.now()}`;
@@ -109,13 +110,18 @@ test('an employee cannot work on a colleague’s request', async ({ page }) => {
 });
 
 test('data survives a server restart', async () => {
-  // Start a second, brand-new API process on the same database file and read the request back.
+  // Start a second, brand-new API process on the same database and read the request back.
   const serverDir = fileURLToPath(new URL('../../server/', import.meta.url));
   const port = 4199;
   // Plain `node --import tsx` (no shell wrapper) so kill() really stops the server on every OS.
   const proc = spawn(process.execPath, ['--import', 'tsx', 'src/index.ts'], {
     cwd: serverDir,
-    env: { ...process.env, DATABASE_URL: 'file:./e2e.db', PORT: String(port), NODE_ENV: 'test' },
+    env: {
+      ...process.env,
+      DATABASE_URL: testDatabaseUrl('e2e'),
+      PORT: String(port),
+      NODE_ENV: 'test',
+    },
     stdio: 'ignore',
   });
   try {

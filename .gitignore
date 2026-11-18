@@ -8,3 +8,7 @@ test-results
 playwright-report
 server/prisma/*.db*
 
+.vercel
+
+.vercel
+.env*

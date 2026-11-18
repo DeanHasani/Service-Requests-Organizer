@@ -1,6 +1,6 @@
 # Database
 
-SQLite, managed by Prisma. Schema: [`server/prisma/schema.prisma`](../server/prisma/schema.prisma). Migrations: `server/prisma/migrations/`.
+PostgreSQL (Supabase), managed by Prisma. The live site uses the `public` schema; local dev, API tests and e2e tests use the `dev`, `test` and `e2e` schemas ([deployment.md](deployment.md)). Migrations were regenerated for Postgres as one `init` migration when the project moved off SQLite. Schema: [`server/prisma/schema.prisma`](../server/prisma/schema.prisma). Migrations: `server/prisma/migrations/`.
 
 ## Entity relationships
 
@@ -151,6 +151,16 @@ The version check is an `updateMany ... where { id, version }`. If it matches ze
 
 `npm run db:seed` upserts four users by email and inserts 18 requests keyed by fixed `clientRequestId`s, each with backdated activity and notes. Running it again skips everything that exists.
 
-It also adds 90 resolved requests spread over four months so analytics and smart assignment have real history to work from. Who handled each one, how fast and whether it was reopened follow a fixed per-person profile (Dean is strongest on Network, Roman on Hardware and Facilities, Roxanne on Account access and Software, each with a weak spot), generated deterministically so every run produces the same data. It is demo data, clearly keyed (`…-9100-…`), and replaces an earlier, evenly spread version (`…-9000-…`) if a database still has it.
+It also adds 160 resolved requests spread over four months so analytics and smart assignment have real history to work from. Who handled each one, how fast and whether it was reopened follow a fixed per-person profile, generated deterministically so every run produces the same data:
+
+- **Dean**: network (switches, VPN, Wi-Fi); slow and error-prone on building issues
+- **Roman**: hardware (laptops, printers, peripherals); avoids software installs
+- **Roxanne**: accounts and access (onboarding, MFA, permissions), software second
+- **Mira**: office operations (facilities, moves, events, errands), handy with hardware
+- **Theo**: software and licences, second-best on the network; not one for facilities
+
+The current requests include unassigned work due soon (so smart assignment has something to suggest), a busy Dean (so workload balancing shows), and a mix of overdue, due-soon and on-track deadlines. History is keyed `…-9200-…` and replaces earlier versions (`…-9000-…`, `…-9100-…`).
+
+`npm run db:demo` (seed with `--fresh`) first removes all requests, notes, history, notifications, sessions and non-demo accounts, and resets the demo accounts, so the data is exactly this story with dates relative to now. Run it before a presentation.
 
 Fields added since the first release, each with its own migration: `User.mustChangePassword`, `User.deletedAt` and `deletedById`, `Request.dueAt`, `Request.category`, and the automatic priority rule (`escalateTo`, `escalatedAt`, `escalationById`).

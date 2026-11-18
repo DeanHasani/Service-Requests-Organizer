@@ -4,17 +4,17 @@
 
 Tests go through the same entry points that users and the browser use.
 
-- API tests (Supertest and Vitest) send real HTTP calls to the real Express app backed by a real SQLite database. Every business rule, permission and error path is covered here. Most tests live at this level because the server is what enforces the rules.
+- API tests (Supertest and Vitest) send real HTTP calls to the real Express app backed by a real Postgres database. Every business rule, permission and error path is covered here. Most tests live at this level because the server is what enforces the rules.
 - Frontend tests (React Testing Library and Vitest) render the real app, with its router, auth provider, query client and pages, in jsdom. `fetch` is answered by a small route table, and the tests find elements by label and role the way a user would.
 - End-to-end tests (Playwright) run the whole journey, from manager to employee and back to manager, in Chromium against a running API and web app with their own database.
 
-Each layer runs on an isolated database, so tests never touch `dev.db`:
+Each layer runs on its own Postgres schema, so tests never touch dev or live data:
 
-| Layer     | Database                | How it is prepared                                                                                                               |
-| --------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| API tests | `server/prisma/test.db` | Deleted and rebuilt with `prisma migrate deploy` before each run; every test empties the tables and creates a known set of users |
-| E2E       | `server/prisma/e2e.db`  | Deleted, migrated and seeded with the demo data before each run (API on :4100, web on :5174)                                     |
-| Frontend  | none                    | `fetch` is stubbed                                                                                                               |
+| Layer     | Database      | How it is prepared                                                                                                |
+| --------- | ------------- | ----------------------------------------------------------------------------------------------------------------- |
+| API tests | schema `test` | Wiped and rebuilt from migrations before each run; every test empties the tables and creates a known set of users |
+| E2E       | schema `e2e`  | Wiped, migrated and seeded with the demo data before each run (API on :4100, web on :5174)                        |
+| Frontend  | none          | `fetch` is stubbed                                                                                                |
 
 ## Commands
 

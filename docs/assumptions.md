@@ -68,9 +68,9 @@ OPEN ──▶ IN_PROGRESS ──▶ RESOLVED
 ## Technical
 
 - Single company, single timezone. Dates are stored in UTC and shown in the browser's locale.
-- Small team (tens of users, thousands of requests). SQLite is enough.
+- Small team (tens of users, thousands of requests). A single Postgres database is plenty.
 - Sessions last 8 hours and slide forward while in use.
-- Search matches reference, title, requester name, requester contact and description, case-insensitive for ASCII (SQLite `LIKE`).
+- Search matches reference, title, requester name, requester contact and description, case-insensitive (Postgres `ILIKE`).
 
 ## Out of scope
 

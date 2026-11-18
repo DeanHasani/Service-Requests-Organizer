@@ -138,13 +138,13 @@ export async function listRequests(
       assignedToId: assignee === 'me' ? user.id : assignee === 'none' ? null : assignee,
     }),
     ...(q && {
-      // SQLite LIKE: case-insensitive for ASCII.
+      // Case-insensitive, like the search box suggests (Postgres ILIKE).
       OR: [
-        { referenceNumber: { contains: q } },
-        { title: { contains: q } },
-        { requesterName: { contains: q } },
-        { requesterContact: { contains: q } },
-        { description: { contains: q } },
+        { referenceNumber: { contains: q, mode: 'insensitive' } },
+        { title: { contains: q, mode: 'insensitive' } },
+        { requesterName: { contains: q, mode: 'insensitive' } },
+        { requesterContact: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } },
       ],
     }),
   };

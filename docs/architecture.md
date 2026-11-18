@@ -2,7 +2,7 @@
 
 ## Overview
 
-DESKFLOW is a single-page React app talking to an Express REST API over JSON. The API owns every business rule and permission check and persists to SQLite through Prisma. A small `shared` package holds the Zod schemas, enums, lifecycle rules and permission helpers, so the client and server validate and decide the same way.
+DESKFLOW is a single-page React app talking to an Express REST API over JSON. The API owns every business rule and permission check and persists to PostgreSQL (Supabase) through Prisma. Live, it runs on Vercel: the client as static files and the API as one function on the same domain ([deployment.md](deployment.md)). A small `shared` package holds the Zod schemas, enums, lifecycle rules and permission helpers, so the client and server validate and decide the same way.
 
 ```mermaid
 flowchart LR
@@ -16,7 +16,7 @@ flowchart LR
     E[error handler]
     P[(Prisma Client)]
   end
-  DB[(SQLite file<br/>dev.db)]
+  DB[(PostgreSQL<br/>Supabase)]
   SH[[shared<br/>schemas, enums,<br/>canWorkOn / canAssign /<br/>canTransition]]
 
   UI -- "fetch /api/*<br/>cookie + X-CSRF-Token" --> MW --> R --> S --> P --> DB
@@ -81,7 +81,7 @@ While a user still has a temporary password, every call except `/auth/me`, `/aut
 sequenceDiagram
   participant B as Browser
   participant A as API
-  participant D as SQLite
+  participant D as Postgres
   B->>A: POST /api/auth/login {email, password}
   A->>D: find user by email
   A->>A: bcrypt.compare (dummy hash if email unknown)
@@ -130,18 +130,18 @@ A single API process is assumed. Running several would still not duplicate notif
 
 ## Technical decisions and tradeoffs
 
-| Decision                                                 | Why                                                                                                                                                         | Tradeoff                                                                                                                             |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| SQLite + Prisma                                          | Real relational DB with migrations, no server to run, one file to back up.                                                                                  | One writer at a time; fine for a small team, not for hundreds of concurrent users. Postgres is a `provider` change plus a migration. |
-| Prisma 6                                                 | Prisma 7 requires driver adapters and a new config file. Version 6 is stable and simpler to set up.                                                         | Will need an upgrade eventually.                                                                                                     |
-| Custom session table instead of `express-session`        | About 60 lines, typed, stores only token hashes, easy to revoke per user.                                                                                   | Our own code to maintain instead of a library.                                                                                       |
-| Server runs TypeScript through `tsx`                     | No build step; the `shared` package is consumed as source by both sides.                                                                                    | Slightly slower cold start than compiled JS.                                                                                         |
-| Optimistic concurrency (`version`)                       | Two people editing the same request cannot silently overwrite each other; the loser gets a clear `409` and the screen refreshes.                            | Clients must send the version they read.                                                                                             |
-| Idempotency key on create                                | Double-clicks, retries after a timeout and two tabs submitting the same form all produce one request.                                                       | One extra unique column.                                                                                                             |
-| Reference numbers from a counter row                     | The counter is incremented inside the create transaction; SQLite serialises writes, so numbers never repeat. A concurrency test creates 8 requests at once. | Numbers are not reused if a create is rolled back. That is fine for a reference.                                                     |
-| Business rule + audit write in one transaction           | The activity log can never disagree with the data.                                                                                                          | Slightly longer transactions.                                                                                                        |
-| Priority stored with a numeric rank                      | Sorting by priority gives Urgent > High > Normal > Low instead of alphabetical order.                                                                       | One denormalised column, written by the service.                                                                                     |
-| Unassigning an in-progress request moves it back to Open | "In progress" requires an owner (brief rule); the alternative would leave an impossible state.                                                              | An extra activity entry explains it.                                                                                                 |
-| No hard deletes                                          | History has to stay intact, so foreign keys are `RESTRICT` and users are deactivated with their history kept.                                               | Data only grows; acceptable at this scale.                                                                                           |
-| URL-held list filters                                    | Filters survive reloads and can be shared as links.                                                                                                         | None                                                                                                                                 |
-| Motion only where it explains a change                   | Lifecycle rail fill on status change, sliding nav indicator, list items entering/leaving, dialogs and drawer. Respects reduced-motion settings.             | None                                                                                                                                 |
+| Decision                                                 | Why                                                                                                                                                                        | Tradeoff                                                                                            |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Postgres (Supabase) + Prisma                             | Real relational DB with migrations, hosted for free, reachable from serverless functions through Supabase's pooler.                                                        | Needs a network database for local dev and tests too; each uses its own schema so nothing collides. |
+| Prisma 6                                                 | Prisma 7 requires driver adapters and a new config file. Version 6 is stable and simpler to set up.                                                                        | Will need an upgrade eventually.                                                                    |
+| Custom session table instead of `express-session`        | About 60 lines, typed, stores only token hashes, easy to revoke per user.                                                                                                  | Our own code to maintain instead of a library.                                                      |
+| Server runs TypeScript through `tsx`                     | No build step; the `shared` package is consumed as source by both sides.                                                                                                   | Slightly slower cold start than compiled JS.                                                        |
+| Optimistic concurrency (`version`)                       | Two people editing the same request cannot silently overwrite each other; the loser gets a clear `409` and the screen refreshes.                                           | Clients must send the version they read.                                                            |
+| Idempotency key on create                                | Double-clicks, retries after a timeout and two tabs submitting the same form all produce one request.                                                                      | One extra unique column.                                                                            |
+| Reference numbers from a counter row                     | The counter is incremented inside the create transaction; the counter row is locked by the update, so numbers never repeat. A concurrency test creates 8 requests at once. | Numbers are not reused if a create is rolled back. That is fine for a reference.                    |
+| Business rule + audit write in one transaction           | The activity log can never disagree with the data.                                                                                                                         | Slightly longer transactions.                                                                       |
+| Priority stored with a numeric rank                      | Sorting by priority gives Urgent > High > Normal > Low instead of alphabetical order.                                                                                      | One denormalised column, written by the service.                                                    |
+| Unassigning an in-progress request moves it back to Open | "In progress" requires an owner (brief rule); the alternative would leave an impossible state.                                                                             | An extra activity entry explains it.                                                                |
+| No hard deletes                                          | History has to stay intact, so foreign keys are `RESTRICT` and users are deactivated with their history kept.                                                              | Data only grows; acceptable at this scale.                                                          |
+| URL-held list filters                                    | Filters survive reloads and can be shared as links.                                                                                                                        | None                                                                                                |
+| Motion only where it explains a change                   | Lifecycle rail fill on status change, sliding nav indicator, list items entering/leaving, dialogs and drawer. Respects reduced-motion settings.                            | None                                                                                                |
