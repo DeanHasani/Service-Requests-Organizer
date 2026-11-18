@@ -129,12 +129,13 @@ type Stat = {
 
 function StatTile({ label, value, note, icon: Icon, alert }: Stat) {
   return (
-    <div className="ledger-cell flex flex-col gap-3 rounded-panel border border-line bg-surface px-4 py-3.5">
+    <div className="ledger-cell flex flex-col justify-between gap-3 rounded-panel border border-line bg-surface px-4 py-4">
       <span className="flex items-start justify-between gap-2">
         <span className="text-sm font-semibold text-ink">{label}</span>
         <Icon className="size-[18px] shrink-0 text-ink" strokeWidth={1.75} aria-hidden />
       </span>
-      <span className="flex items-baseline gap-2">
+      {/* The note has its own line under the number and may wrap to two, so it is never cut. */}
+      <span className="flex flex-col gap-1.5">
         <span
           className={cx(
             'tabular text-[28px] leading-none font-semibold tracking-[-0.03em] whitespace-nowrap',
@@ -143,7 +144,7 @@ function StatTile({ label, value, note, icon: Icon, alert }: Stat) {
         >
           {value}
         </span>
-        <span className="truncate text-xs text-ink-3">{note}</span>
+        <span className="line-clamp-2 text-xs leading-snug text-ink-3">{note}</span>
       </span>
     </div>
   );
