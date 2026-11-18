@@ -143,21 +143,22 @@ function Summary({ data, range }: { data: Analytics; range: AnalyticsRange }) {
       {tiles.map(({ label, value, note, icon: Icon }) => (
         <div
           key={label}
-          className="ledger-cell flex h-[124px] min-w-0 flex-col justify-between gap-3 overflow-hidden rounded-panel border border-line bg-surface px-4 py-4"
+          className="ledger-cell kpi-tile flex h-[112px] min-w-0 flex-col justify-between gap-2 overflow-hidden rounded-panel border border-line bg-surface px-3.5 py-3.5"
         >
           <span className="flex items-start justify-between gap-2">
             {/* One line only: a squeezed neighbour must never make the row taller. */}
-            <span className="truncate text-sm font-semibold whitespace-nowrap text-ink">
+            <span className="kpi-label truncate font-semibold whitespace-nowrap text-ink">
               {label}
             </span>
-            <Icon className="size-[18px] shrink-0 text-ink" strokeWidth={1.75} aria-hidden />
+            <Icon className="size-4 shrink-0 text-ink" strokeWidth={1.75} aria-hidden />
           </span>
-          {/* The note sits on its own line under the number, so it is never cut off. */}
-          <span className="flex flex-col gap-1.5">
-            <span className="ledger-num tabular inline-block origin-left text-[36px] leading-none font-semibold tracking-[-0.03em] whitespace-nowrap">
+          {/* Text sizes follow the card's width (styles.css), so values always fit and grow with
+              the card when it widens on hover. */}
+          <span className="flex flex-col gap-1">
+            <span className="kpi-num tabular leading-none font-semibold tracking-[-0.03em] whitespace-nowrap">
               {value}
             </span>
-            <span className="truncate text-xs whitespace-nowrap text-ink-3">{note}</span>
+            <span className="kpi-note truncate whitespace-nowrap text-ink-3">{note}</span>
           </span>
         </div>
       ))}

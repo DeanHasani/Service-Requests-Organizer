@@ -62,11 +62,11 @@ export function NotificationBell({
         aria-expanded={open}
         aria-haspopup="dialog"
         className={cx(
-          'relative grid size-9 place-items-center rounded-md transition-colors',
+          'relative grid size-8 place-items-center rounded-md transition-colors',
           onDark ? 'text-navy-ink hover:bg-navy-2 hover:text-white' : 'text-ink-2 hover:bg-sunken',
         )}
       >
-        <Bell className="size-5" aria-hidden />
+        <Bell className="size-[18px]" aria-hidden />
         {unread > 0 && (
           <span className="tabular absolute -top-0.5 -right-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-urgent px-1 text-[10px] font-bold text-white ring-2 ring-navy">
             {unread > 99 ? '99+' : unread}

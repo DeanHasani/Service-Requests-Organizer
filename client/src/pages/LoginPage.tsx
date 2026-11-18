@@ -321,12 +321,43 @@ export function LoginPage() {
                   >
                     Forgot password?
                   </button>
-                  {forgot && (
-                    <p className="mt-1.5 text-ink-2">
-                      Ask your manager to reset it. They’ll give you a temporary password, and you
-                      choose a new one when you sign in.
-                    </p>
-                  )}
+                  {/* Height eases open (the card and its outline grow with it), then the text
+                      fades in a moment later. Closing reverses it. */}
+                  <AnimatePresence initial={false}>
+                    {forgot && (
+                      <motion.div
+                        key="forgot"
+                        initial={{ height: 0 }}
+                        animate={{ height: 'auto' }}
+                        exit={{ height: 0 }}
+                        transition={{ duration: reduce ? 0 : 0.6, ease: [0.22, 1, 0.36, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <motion.p
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{
+                            opacity: 1,
+                            y: 0,
+                            transition: {
+                              duration: reduce ? 0 : 0.55,
+                              delay: reduce ? 0 : 0.18,
+                              ease: 'easeOut',
+                            },
+                          }}
+                          exit={{
+                            opacity: 0,
+                            y: -4,
+                            transition: { duration: reduce ? 0 : 0.25, ease: 'easeIn' },
+                          }}
+                          className="pt-1.5 text-ink-2"
+                        >
+                          Ask your manager to reset it. They’ll give you a temporary password, and
+                          you choose a new one when you sign in. If you are a manager, contact the
+                          Super Admin.
+                        </motion.p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
                 <Button
                   type="submit"
