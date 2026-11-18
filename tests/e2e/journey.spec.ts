@@ -43,7 +43,7 @@ test('manager creates and assigns, employee works and resolves, manager verifies
   await expect(page.getByRole('heading', { name: TITLE })).toBeVisible();
   requestUrl = new URL(page.url()).pathname;
   await expect(
-    page.getByText('Nobody owns this yet. Choose an assignee in Details.'),
+    page.getByText('Nobody owns this yet. Pick someone from the suggestions below, or in Details.'),
   ).toBeVisible();
 
   // 3. Manager assigns an employee.

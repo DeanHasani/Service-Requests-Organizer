@@ -14,11 +14,25 @@
 
 **Deadline**: when a manager expects a request resolved: a date, plus an optional time (no time means end of that day). Optional. Overdue means past it and not resolved. Requests show a live countdown to it.
 
-**Category**: what kind of issue a request is: Hardware, Software, Network, Access & accounts, Facilities or Other. Whoever reports it picks one; a manager can correct it. Requests from before categories existed show as Uncategorised.
+**Category**: what kind of issue a request is: Hardware, Software, Network, Account access, Facilities or General support. Whoever reports it picks one; a manager can correct it. Requests from before categories existed show as Uncategorised.
 
-**Analytics**: the manager-only page with team-wide numbers for the last 30 or 90 days or all time: volume and speed by category, the weekly trend, reopened work and workload per employee.
+**Manager insights (Insights)**: the manager-only page with team-wide numbers for the last 7, 30 or 90 days or all time: key metrics, status, priority and category mix, trends, reopened and inactive requests, and each employee's workload and outcomes with sample sizes.
 
-**Auto priority**: an optional rule a manager sets with a deadline: once the deadline is under 24 hours away, the priority rises to the level chosen (Normal, High or Urgent). It runs once, only raises, and is recorded in the history in the manager's name.
+**Smart assignment**: suggestions for who should take an unassigned request, worked out from the team's real history and current workload. Suggestions only; a manager always confirms the assignment.
+
+**Fix that held**: a resolution that was not reopened afterwards. A request that is reopened counts against the resolution before it.
+
+**Gone quiet**: an open request with no changes or notes for 5 days or more.
+
+**Working priority**: the priority to work by. Normally the priority people chose; while a deadline is close or past, the deadline monitor raises it (one step, or two once overdue, never past Urgent, at least the manager's minimum if set). The chosen priority is never overwritten.
+
+**Deadline status**: on track, due soon (approaching: within 24 hours), overdue, or completed. Separate from the request's lifecycle status.
+
+**Deadline monitor**: the server job that checks deadlines every minute and at startup, updates deadline status and working priority, records automatic events (shown as DESKFLOW) and sends reminders.
+
+**Notification**: an in-app message for one person (bell icon), about an assignment or a deadline. Each reminder is sent once per stage and deadline cycle.
+
+**Needs attention / Your deadlines**: dashboard lists of requests close to or past their deadline, with time left and the next step.
 
 **Temporary password**: a one-time password from a manager (on reset or for a new account). The holder must choose their own before using the app.
 

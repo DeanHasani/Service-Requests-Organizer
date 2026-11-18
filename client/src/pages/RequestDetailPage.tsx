@@ -18,6 +18,7 @@ import {
   canWorkOn,
   CATEGORIES,
   CATEGORY_LABEL,
+  DEADLINE_STATE_LABEL,
   ESCALATION_HOURS,
   UNCATEGORISED,
   noteSchema,
@@ -37,6 +38,7 @@ import {
   useAddNote,
   useAssign,
   useAssignees,
+  useRecommendations,
   useChangeStatus,
   useNotes,
   useRequest,
@@ -46,7 +48,7 @@ import {
 import { ApiError, errorMessage } from '../lib/api';
 import { ErrorPage, ErrorState, errorKind } from '../components/errors';
 import { ActivitySkeleton, NotesSkeleton, RequestDetailSkeleton } from '../components/skeletons';
-import { formatDateTime, formatDeadline, timeAgo } from '../lib/format';
+import { cx, formatDateTime, formatDeadline, timeAgo } from '../lib/format';
 import {
   DeadlineInput,
   deadlineOf,
@@ -54,6 +56,7 @@ import {
   sameDeadline,
 } from '../components/DeadlineInput';
 import { ActivityList } from '../components/ActivityList';
+import { SmartAssignPanel } from '../components/SmartAssign';
 import { ContactField } from '../components/ContactField';
 import { toast } from 'sonner';
 import {
@@ -72,7 +75,7 @@ import {
   Countdown,
   DueBadge,
   LifecycleRail,
-  PriorityBadge,
+  RequestPriority,
   RequestRef,
   SourceLabel,
   StatusBadge,
@@ -106,6 +109,48 @@ export function RequestDetailPage() {
   return <RequestView request={q.data} />;
 }
 
+/** Smart assignment for an unassigned request; the manager confirms before anything changes. */
+function SmartAssign({ request: r }: { request: ServiceRequest }) {
+  const q = useRecommendations(r.id, !!r.category);
+  const assign = useAssign(r.id);
+  return (
+    <SmartAssignPanel
+      data={q.data}
+      loading={!!r.category && q.isPending}
+      error={
+        !r.category
+          ? 'Set a category on this request (Edit details) to get suggestions.'
+          : q.isError
+            ? errorMessage(q.error)
+            : null
+      }
+      assigning={assign.isPending}
+      onAssign={async (c) => {
+        try {
+          await assign.mutateAsync({ assignedToId: c.user.id, version: r.version });
+          toast.success(`${r.referenceNumber} assigned to ${c.user.name}`);
+        } catch {
+          /* the mutation shows the error */
+        }
+      }}
+    />
+  );
+}
+
+/** "Due soon: 6 hours left" / "Overdue by 2 hours" / "On track" / "Completed". */
+function DeadlineStateText({ request: r }: { request: ServiceRequest }) {
+  if (!r.deadlineState) return null;
+  const tone =
+    r.deadlineState === 'OVERDUE'
+      ? 'text-urgent'
+      : r.deadlineState === 'APPROACHING'
+        ? 'text-high'
+        : r.deadlineState === 'COMPLETED'
+          ? 'text-resolved'
+          : 'text-ink';
+  return <span className={cx('font-medium', tone)}>{DEADLINE_STATE_LABEL[r.deadlineState]}</span>;
+}
+
 function RequestView({ request: r }: { request: ServiceRequest }) {
   const user = useCurrentUser();
   const [editing, setEditing] = useState(false);
@@ -127,7 +172,7 @@ function RequestView({ request: r }: { request: ServiceRequest }) {
           <div className="flex flex-wrap items-center gap-2.5">
             <RequestRef value={r.referenceNumber} className="text-[13px]" />
             <StatusBadge status={r.status} />
-            <PriorityBadge priority={r.priority} />
+            <RequestPriority request={r} />
             <DueBadge dueAt={r.dueAt} status={r.status} />
           </div>
           <h1 className="mt-2 text-[22px] leading-tight font-semibold tracking-[-0.015em] text-ink">
@@ -144,6 +189,9 @@ function RequestView({ request: r }: { request: ServiceRequest }) {
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-6">
           <LifecyclePanel request={r} user={user} />
+          {user.role === 'MANAGER' && !r.assignedTo && r.status !== 'RESOLVED' && (
+            <SmartAssign request={r} />
+          )}
           <Panel>
             <PanelHeader title="Description" />
             <p className="px-4 py-4 text-sm leading-relaxed whitespace-pre-wrap text-ink">
@@ -178,7 +226,7 @@ function statusLine(r: ServiceRequest, user: User): ReactNode {
   }
   if (!owner) {
     return user.role === 'MANAGER'
-      ? 'Nobody owns this yet. Choose an assignee in Details.'
+      ? 'Nobody owns this yet. Pick someone from the suggestions below, or in Details.'
       : 'Waiting for your manager to review it and choose who works on it.';
   }
   if (owner.id === user.id) {
@@ -311,7 +359,14 @@ function PropertiesPanel({ request: r, user }: { request: ServiceRequest; user: 
               )}
             </Row>
             <Row label="Priority">
-              <PriorityBadge priority={r.priority} />
+              <span className="flex flex-col items-start gap-0.5">
+                <RequestPriority request={r} />
+                {r.escalatedPriority && (
+                  <span className="text-xs text-ink-3">
+                    Raised for the deadline; set as {PRIORITY_LABEL[r.priority]}
+                  </span>
+                )}
+              </span>
             </Row>
             <Row label="Deadline">
               {r.dueAt ? (
@@ -323,11 +378,9 @@ function PropertiesPanel({ request: r, user }: { request: ServiceRequest; user: 
                 <span className="text-ink-3">Not set</span>
               )}
             </Row>
-            {r.dueAt && r.escalateTo && (
-              <Row label="Auto priority">
-                {r.escalatedAt
-                  ? `Raised to ${PRIORITY_LABEL[r.escalateTo]}`
-                  : `Rises to ${PRIORITY_LABEL[r.escalateTo]} in the last ${ESCALATION_HOURS} h`}
+            {r.deadlineState && (
+              <Row label="Deadline status">
+                <DeadlineStateText request={r} />
               </Row>
             )}
           </>
@@ -467,6 +520,12 @@ function TriageEditor({ request: r }: { request: ServiceRequest }) {
             </option>
           ))}
         </Select>
+        {r.escalatedPriority && (
+          <span className="mt-1 block text-xs text-ink-3">
+            Working priority is {PRIORITY_LABEL[r.escalatedPriority]} while the deadline is{' '}
+            {r.deadlineState === 'OVERDUE' ? 'past' : 'close'}. This stays as you set it.
+          </span>
+        )}
       </Row>
       {/* Full width: date and time need more room than the value column gives */}
       <div className="px-4 py-3">
@@ -489,24 +548,23 @@ function TriageEditor({ request: r }: { request: ServiceRequest }) {
           <DeadlineInput value={due} onChange={setDue} disabled={saving} clearable />
           {due.date && (
             <label className="flex flex-col gap-1 text-[13px] text-ink-2">
-              In the last {ESCALATION_HOURS} hours, raise priority to
+              When the deadline is close, raise the working priority to
               <Select
                 value={escalate}
                 onChange={(e) => setEscalate(e.target.value)}
                 disabled={saving}
               >
-                <option value="">Keep as it is</option>
+                <option value="">One level up (default)</option>
                 {PRIORITIES.filter((p) => p !== 'LOW').map((p) => (
                   <option key={p} value={p}>
                     {PRIORITY_LABEL[p]}
                   </option>
                 ))}
               </Select>
-              {r.escalatedAt && r.escalateTo && escalate === savedEscalate && (
-                <span className="text-xs text-ink-3">
-                  Already raised to {PRIORITY_LABEL[r.escalateTo]}. A new deadline re-arms it.
-                </span>
-              )}
+              <span className="text-xs text-ink-3">
+                Within {ESCALATION_HOURS} hours of the deadline, or once it passes. The priority you
+                set is kept.
+              </span>
             </label>
           )}
         </dd>

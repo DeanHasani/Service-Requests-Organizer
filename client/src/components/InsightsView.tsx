@@ -13,7 +13,7 @@ import { PRIORITIES, PRIORITY_LABEL, type Insights, type ServiceRequest } from '
 import { cx, formatDuration, timeAgo } from '../lib/format';
 import { ActivityList } from './ActivityList';
 import { EmptyState, Panel, PanelHeader } from './ui';
-import { DueBadge, PriorityBadge, RequestRef, StatusBadge } from './request-bits';
+import { DueBadge, RequestPriority, RequestRef, StatusBadge } from './request-bits';
 
 /**
  * One person's work: what they hold now, what they have resolved and how fast, and what they did
@@ -171,7 +171,7 @@ function RequestRows({ items, resolved }: { items: ServiceRequest[]; resolved?: 
                 )}
               </span>
             </span>
-            {resolved ? <PriorityBadge priority={r.priority} /> : <StatusBadge status={r.status} />}
+            {resolved ? <RequestPriority request={r} /> : <StatusBadge status={r.status} />}
           </Link>
         </li>
       ))}

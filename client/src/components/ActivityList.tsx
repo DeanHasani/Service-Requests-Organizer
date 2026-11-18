@@ -1,8 +1,12 @@
 import { Link } from 'react-router';
 import { AnimatePresence, motion } from 'motion/react';
 import {
+  AlarmClock,
+  ArrowDownToLine,
   ArrowRightLeft,
+  ArrowUpToLine,
   CalendarClock,
+  Hourglass,
   CheckCircle2,
   CirclePlus,
   Flag,
@@ -35,6 +39,10 @@ const icon: Record<ActionType, { Icon: typeof CirclePlus; tone: string }> = {
   RESOLVED: { Icon: CheckCircle2, tone: ON_NAVY.green },
   REOPENED: { Icon: RotateCcw, tone: ON_NAVY.blue },
   DEADLINE_CHANGED: { Icon: CalendarClock, tone: ON_NAVY.amber },
+  DEADLINE_APPROACHING: { Icon: Hourglass, tone: ON_NAVY.amber },
+  DEADLINE_OVERDUE: { Icon: AlarmClock, tone: 'text-urgent' },
+  PRIORITY_ESCALATED: { Icon: ArrowUpToLine, tone: ON_NAVY.orange },
+  PRIORITY_RESTORED: { Icon: ArrowDownToLine, tone: ON_NAVY.neutral },
 };
 
 const refLink = (a: Activity) => (
@@ -105,7 +113,7 @@ export function ActivityList({
               </span>
               <div className="min-w-0 flex-1 pt-[3px] text-[13px] leading-snug">
                 <p className="text-ink-2">
-                  <span className="font-medium text-ink">{a.actor.name}</span>{' '}
+                  <span className="font-medium text-ink">{a.actor?.name ?? 'DESKFLOW'}</span>{' '}
                   {showRequest ? <DescriptionWithLink activity={a} /> : a.description}
                 </p>
                 {showsValues(a) && (a.oldValue || a.newValue) && (

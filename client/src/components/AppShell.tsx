@@ -19,6 +19,7 @@ import { useDashboard } from '../lib/queries';
 import { cx } from '../lib/format';
 import { Avatar } from './ui';
 import { ErrorBoundary } from './errors';
+import { NotificationBell } from './NotificationBell';
 
 function Logo() {
   return (
@@ -81,7 +82,8 @@ function NavItem({
   );
 }
 
-function SidebarContent() {
+/** `showBell`: the desktop sidebar has the bell; in the phone drawer it lives in the top bar. */
+function SidebarContent({ showBell = false }: { showBell?: boolean }) {
   const user = useCurrentUser();
   const { logout } = useAuth();
   const { data: summary } = useDashboard();
@@ -89,8 +91,9 @@ function SidebarContent() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-16 items-center px-5">
+      <div className="flex h-16 items-center justify-between gap-2 px-5 pr-3">
         <Logo />
+        {showBell && <NotificationBell align="left" />}
       </div>
       <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5 px-3 pt-2">
         <NavItem to="/" end icon={LayoutGrid} label="Dashboard" />
@@ -111,9 +114,7 @@ function SidebarContent() {
           />
         )}
         <NavItem to="/team" icon={Users} label="Team" />
-        {user.role === 'MANAGER' && (
-          <NavItem to="/analytics" icon={ChartColumn} label="Analytics" />
-        )}
+        {user.role === 'MANAGER' && <NavItem to="/analytics" icon={ChartColumn} label="Insights" />}
         <NavLink
           to="/requests/new"
           className="mt-5 flex h-9 items-center justify-center gap-2 rounded-md border border-white/12 text-[13px] font-medium text-white transition-[background-color,transform] duration-150 hover:bg-navy-2 active:scale-[0.97]"
@@ -163,26 +164,29 @@ export function AppShell() {
         Skip to content
       </a>
 
-      <aside className="fixed inset-y-0 left-0 hidden w-60 bg-navy lg:block">
-        <SidebarContent />
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 bg-navy lg:block">
+        <SidebarContent showBell />
       </aside>
 
       {/* Mobile top bar + drawer */}
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between bg-navy px-4 lg:hidden">
         <Logo />
-        <button
-          type="button"
-          onClick={() => setDrawer(true)}
-          aria-label="Open menu"
-          aria-expanded={drawer}
-          // Hidden while the menu is open (it has its own close button); fades back after.
-          className={cx(
-            'grid size-9 place-items-center rounded-md text-white transition-[opacity,transform] duration-200 hover:bg-navy-2',
-            drawer ? 'pointer-events-none scale-90 opacity-0' : 'opacity-100',
-          )}
-        >
-          <Menu className="size-5" aria-hidden />
-        </button>
+        <span className="flex items-center gap-1">
+          <NotificationBell align="right" />
+          <button
+            type="button"
+            onClick={() => setDrawer(true)}
+            aria-label="Open menu"
+            aria-expanded={drawer}
+            // Hidden while the menu is open (it has its own close button); fades back after.
+            className={cx(
+              'grid size-9 place-items-center rounded-md text-white transition-[opacity,transform] duration-200 hover:bg-navy-2',
+              drawer ? 'pointer-events-none scale-90 opacity-0' : 'opacity-100',
+            )}
+          >
+            <Menu className="size-5" aria-hidden />
+          </button>
+        </span>
       </header>
       <AnimatePresence>
         {drawer && (

@@ -24,9 +24,9 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   HARDWARE: 'Hardware',
   SOFTWARE: 'Software',
   NETWORK: 'Network',
-  ACCESS: 'Access & accounts',
+  ACCESS: 'Account access',
   FACILITIES: 'Facilities',
-  OTHER: 'Other',
+  OTHER: 'General support',
 };
 /** Shown for requests logged before categories existed. */
 export const UNCATEGORISED = 'Uncategorised';
@@ -42,6 +42,10 @@ export const ACTION_TYPES = [
   'RESOLVED',
   'REOPENED',
   'DEADLINE_CHANGED',
+  'DEADLINE_APPROACHING',
+  'DEADLINE_OVERDUE',
+  'PRIORITY_ESCALATED',
+  'PRIORITY_RESTORED',
 ] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
 
@@ -96,8 +100,46 @@ export function canSeeRequest(user: Actor, request: Visible): boolean {
   );
 }
 
-/** How close to the deadline an automatic priority rule kicks in. */
-export const ESCALATION_HOURS = 24;
+/**
+ * How close to the deadline a request counts as "approaching": reminders go out and its
+ * operational priority rises. A request created with less time left than this is approaching
+ * straight away; it never waits for a threshold that has already passed.
+ */
+export const DEADLINE_WARNING_HOURS = 24;
+/** Kept for the manager's "raise priority to at least" option, which uses the same window. */
+export const ESCALATION_HOURS = DEADLINE_WARNING_HOURS;
+
+/** Where a request stands against its deadline; separate from its lifecycle status. */
+export const DEADLINE_STATES = ['ON_TRACK', 'APPROACHING', 'OVERDUE', 'COMPLETED'] as const;
+export type DeadlineState = (typeof DEADLINE_STATES)[number];
+export const DEADLINE_STATE_LABEL: Record<DeadlineState, string> = {
+  ON_TRACK: 'On track',
+  APPROACHING: 'Due soon',
+  OVERDUE: 'Overdue',
+  COMPLETED: 'Completed',
+};
+
+/**
+ * Deadline status at `now`: null without a deadline; COMPLETED once resolved; OVERDUE once the
+ * deadline has passed; APPROACHING within the warning window; otherwise ON_TRACK. Pure, and
+ * based on absolute instants, so time zones cannot change the answer.
+ */
+export function deadlineStateAt(
+  request: { dueAt: string | Date | null; status: Status },
+  now: number | Date = Date.now(),
+  warningHours = DEADLINE_WARNING_HOURS,
+): DeadlineState | null {
+  if (request.dueAt === null) return null;
+  if (request.status === 'RESOLVED') return 'COMPLETED';
+  const left = new Date(request.dueAt).getTime() - new Date(now).getTime();
+  if (left <= 0) return 'OVERDUE';
+  return left <= warningHours * 3600_000 ? 'APPROACHING' : 'ON_TRACK';
+}
+
+export const PRIORITY_ORDER: Record<Priority, number> = { LOW: 0, NORMAL: 1, HIGH: 2, URGENT: 3 };
+/** The priority to work by: raised by the deadline monitor when escalated, else the original. */
+export const effectivePriority = (r: { priority: Priority; escalatedPriority: Priority | null }) =>
+  r.escalatedPriority ?? r.priority;
 
 /** Past its deadline and still not resolved. */
 export function isOverdue(

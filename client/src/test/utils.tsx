@@ -49,7 +49,9 @@ export const makeRequest = (over: Partial<ServiceRequest> = {}): ServiceRequest 
   resolvedAt: null,
   dueAt: null,
   escalateTo: null,
+  escalatedPriority: null,
   escalatedAt: null,
+  deadlineState: null,
   createdAt: '2026-11-15T09:00:00.000Z',
   updatedAt: '2026-11-15T10:00:00.000Z',
   ...over,
@@ -107,6 +109,8 @@ function fallback(key: string): Reply {
         },
       },
     };
+  if (key === 'GET /notifications') return { body: { data: { items: [], unread: 0 } } };
+  if (key === 'GET /attention') return { body: { data: [] } };
   if (
     key === 'GET /users' ||
     key === 'GET /activity' ||

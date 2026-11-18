@@ -24,6 +24,8 @@ import type { AuthUser } from '../auth';
 import { prisma, type Tx } from '../db';
 import { conflict, forbidden, notFound, rule, staleVersion } from '../lib/errors';
 import { requestInclude, toRequest } from '../lib/serialize';
+import { evaluateRequest } from '../deadlines/monitor';
+import { notifyAssigned } from './notifications';
 
 export const PRIORITY_RANK: Record<Priority, number> = { LOW: 0, NORMAL: 1, HIGH: 2, URGENT: 3 };
 
@@ -226,7 +228,6 @@ export async function createRequest(
           priority,
           dueAt,
           escalateTo,
-          escalationById: escalateTo ? user.id : null,
           referenceNumber: formatReference(counter.value),
           priorityRank: PRIORITY_RANK[priority],
           assignedToId: assignee?.id ?? null,
@@ -260,7 +261,10 @@ export async function createRequest(
       await log(tx, created.id, user.id, entries);
       return created.id;
     });
-    return { request: await getRequest(id, user), created: true };
+    await evaluateRequest(id);
+    const created = await getRequest(id, user);
+    if (created.assignedTo) await notifyAssigned(await dueOf(id), created.assignedTo.id, user.name);
+    return { request: created, created: true };
   } catch (err) {
     // Two identical submissions raced past the first check; return the winner.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -328,8 +332,8 @@ export async function updateRequest(id: number, input: UpdateRequestInput, user:
       const next = input.dueAt === null ? null : new Date(input.dueAt);
       if ((next?.getTime() ?? null) !== (current.dueAt?.getTime() ?? null)) {
         data.dueAt = next;
-        // A new deadline gives the automatic priority rule a fresh chance to run.
-        data.escalatedAt = null;
+        // A new deadline is a new situation: reminders may be sent again for it.
+        data.deadlineCycle = { increment: 1 };
         const before = formatDue(current.dueAt);
         const after = formatDue(next);
         entries.push({
@@ -347,8 +351,6 @@ export async function updateRequest(id: number, input: UpdateRequestInput, user:
     }
     if (input.escalateTo !== undefined && input.escalateTo !== current.escalateTo) {
       data.escalateTo = input.escalateTo;
-      data.escalationById = input.escalateTo ? user.id : null;
-      data.escalatedAt = null;
       entries.push(escalationEntry(current.escalateTo, input.escalateTo));
     }
     if (!entries.length) {
@@ -359,6 +361,7 @@ export async function updateRequest(id: number, input: UpdateRequestInput, user:
     await writeIfCurrent(tx, id, input.version, data);
     await log(tx, id, user.id, entries);
   });
+  await evaluateRequest(id);
   return getRequest(id, user);
 }
 
@@ -394,7 +397,8 @@ export async function changeStatus(
     await writeIfCurrent(tx, id, version, {
       status,
       ...(resolving && { resolvedById: user.id, resolvedAt: new Date() }),
-      ...(reopening && { resolvedById: null, resolvedAt: null }),
+      // Reopened work is monitored again, with fresh reminders; the deadline itself is kept.
+      ...(reopening && { resolvedById: null, resolvedAt: null, deadlineCycle: { increment: 1 } }),
     });
     const base = {
       fieldName: 'status',
@@ -417,6 +421,7 @@ export async function changeStatus(
             },
     ]);
   });
+  await evaluateRequest(id);
   return getRequest(id, user);
 }
 
@@ -425,6 +430,7 @@ export async function assignRequest(
   { assignedToId, version }: AssignmentInput,
   user: AuthUser,
 ) {
+  let newOwner: number | null = null;
   await prisma.$transaction(async (tx) => {
     const current = await load(id, user, tx);
     if (!canAssign(user)) throw forbidden('Only managers assign requests');
@@ -469,9 +475,19 @@ export async function assignRequest(
       });
     }
     await log(tx, id, user.id, entries);
+    newOwner = next?.id ?? null;
   });
+  await evaluateRequest(id);
+  if (newOwner) await notifyAssigned(await dueOf(id), newOwner, user.name);
   return getRequest(id, user);
 }
+
+/** What an assignment notification needs about the request. */
+const dueOf = (id: number) =>
+  prisma.request.findUniqueOrThrow({
+    where: { id },
+    select: { id: true, referenceNumber: true, title: true, dueAt: true },
+  });
 
 function escalationEntry(before: Priority | null, after: Priority | null): LogEntry {
   return {
@@ -480,61 +496,9 @@ function escalationEntry(before: Priority | null, after: Priority | null): LogEn
     oldValue: before && PRIORITY_LABEL[before],
     newValue: after && PRIORITY_LABEL[after],
     description: after
-      ? `set the priority to rise to ${PRIORITY_LABEL[after]} in the last ${ESCALATION_HOURS} hours`
+      ? `set the working priority to rise to at least ${PRIORITY_LABEL[after]} in the last ${ESCALATION_HOURS} hours`
       : 'turned off the automatic priority change',
   };
-}
-
-/**
- * Applies automatic priority rules: any unresolved request whose deadline is now under 24 hours
- * away (or already past) rises to the priority its manager chose, once, and only ever upward.
- * The change is recorded in the name of the manager who set the rule. Runs every minute.
- */
-export async function runEscalations(now = new Date()) {
-  const due = await prisma.request.findMany({
-    where: {
-      escalateTo: { not: null },
-      escalatedAt: null,
-      status: { not: 'RESOLVED' },
-      dueAt: { not: null, lte: new Date(now.getTime() + ESCALATION_HOURS * 3600_000) },
-    },
-    select: {
-      id: true,
-      version: true,
-      priority: true,
-      escalateTo: true,
-      escalationById: true,
-      createdById: true,
-    },
-  });
-  let raised = 0;
-  for (const r of due) {
-    const target = r.escalateTo!;
-    const rises = PRIORITY_RANK[target] > PRIORITY_RANK[r.priority];
-    try {
-      await prisma.$transaction(async (tx) => {
-        await writeIfCurrent(tx, r.id, r.version, {
-          escalatedAt: now,
-          ...(rises && { priority: target, priorityRank: PRIORITY_RANK[target] }),
-        });
-        if (rises) {
-          await log(tx, r.id, r.escalationById ?? r.createdById, [
-            {
-              actionType: 'PRIORITY_CHANGED',
-              fieldName: 'priority',
-              oldValue: PRIORITY_LABEL[r.priority],
-              newValue: PRIORITY_LABEL[target],
-              description: `priority rose automatically from ${PRIORITY_LABEL[r.priority]} to ${PRIORITY_LABEL[target]} (under ${ESCALATION_HOURS} hours to the deadline)`,
-            },
-          ]);
-        }
-      });
-      if (rises) raised++;
-    } catch {
-      // Someone edited it at the same moment; the next run picks it up again.
-    }
-  }
-  return raised;
 }
 
 /** Used when a user is deactivated: release their unresolved work so nothing is stranded. */

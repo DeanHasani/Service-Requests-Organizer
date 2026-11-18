@@ -36,7 +36,7 @@ import { Avatar, Button, EmptyState, Input, PageHeader, Panel, Select } from '..
 import {
   DueBadge,
   LifecycleRail,
-  PriorityBadge,
+  RequestPriority,
   RequestRef,
   SourceLabel,
   StatusBadge,
@@ -489,7 +489,7 @@ function RequestTable({
                 <SourceLabel source={r.source} iconOnly />
               </td>
               <td className="px-2.5 py-3">
-                <PriorityBadge priority={r.priority} />
+                <RequestPriority request={r} />
               </td>
               <td className="px-2.5 py-3">
                 <StatusBadge status={r.status} />
@@ -543,7 +543,7 @@ function MobileList({ items }: { items: ServiceRequest[] }) {
               </span>
               <span className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
                 <DueBadge dueAt={r.dueAt} status={r.status} className="max-w-full" />
-                <PriorityBadge priority={r.priority} />
+                <RequestPriority request={r} />
               </span>
             </span>
             <span className="mt-1.5 block text-[15px] font-medium text-ink">{r.title}</span>

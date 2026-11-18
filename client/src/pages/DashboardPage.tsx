@@ -4,6 +4,7 @@ import {
   Activity as ActivityIcon,
   AlarmClock,
   BriefcaseBusiness,
+  ChartColumn,
   CircleCheckBig,
   CircleDot,
   Inbox,
@@ -20,8 +21,9 @@ import { ErrorState } from '../components/errors';
 import { ActivitySkeleton, RecentRowsSkeleton } from '../components/skeletons';
 import { cx, timeAgo } from '../lib/format';
 import { ActivityList } from '../components/ActivityList';
+import { DeadlinePanel } from '../components/DeadlinePanel';
 import { Avatar, EmptyState, PageHeader, Panel, PanelHeader, Skeleton } from '../components/ui';
-import { LifecycleRail, PriorityBadge, RequestRef } from '../components/request-bits';
+import { LifecycleRail, RequestPriority, RequestRef } from '../components/request-bits';
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -36,6 +38,16 @@ export function DashboardPage() {
       <PageHeader
         title="Dashboard"
         subtitle={`${greeting()}, ${user.name.split(' ')[0]}. Here is where the queue stands.`}
+        actions={
+          user.role === 'MANAGER' && (
+            <Link
+              to="/analytics"
+              className="inline-flex h-9 items-center gap-2 rounded-control border border-line-strong bg-surface px-3.5 text-sm font-medium text-ink shadow-panel transition-colors hover:bg-sunken"
+            >
+              <ChartColumn className="size-4" aria-hidden /> Manager insights
+            </Link>
+          )
+        }
       />
       {summary.isError ? (
         <Panel>
@@ -44,6 +56,9 @@ export function DashboardPage() {
       ) : (
         <StatusLedger data={summary.data} isManager={user.role === 'MANAGER'} />
       )}
+      <div className="mt-6">
+        <DeadlinePanel manager={user.role === 'MANAGER'} />
+      </div>
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <RecentRequests />
         <RecentActivity />
@@ -336,7 +351,7 @@ function RecentRequests() {
                   </span>
                 </span>
                 <span className="hidden sm:block">
-                  <PriorityBadge priority={r.priority} />
+                  <RequestPriority request={r} />
                 </span>
                 {r.assignedTo ? (
                   <span title={r.assignedTo.name}>

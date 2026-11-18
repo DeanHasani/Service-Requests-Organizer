@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import {
+  ArrowUp,
   CalendarClock,
   Check,
   Flag,
@@ -10,6 +11,7 @@ import {
   Phone,
 } from 'lucide-react';
 import {
+  DEADLINE_WARNING_HOURS,
   PRIORITY_LABEL,
   SOURCE_LABEL,
   STATUS_LABEL,
@@ -64,18 +66,51 @@ const priorityTone: Record<Priority, string> = {
   URGENT: 'text-urgent',
 };
 
-export function PriorityBadge({ priority }: { priority: Priority }) {
+export function PriorityBadge({
+  priority,
+  raisedFrom,
+}: {
+  priority: Priority;
+  /** When the deadline monitor raised the working priority: the original priority. */
+  raisedFrom?: Priority | null;
+}) {
   return (
     <span
+      title={
+        raisedFrom
+          ? `Raised from ${PRIORITY_LABEL[raisedFrom]} because the deadline is close or past`
+          : undefined
+      }
       className={cx(
-        'inline-flex items-center gap-1 text-xs font-medium',
+        'inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap',
         priorityTone[priority],
         priority === 'URGENT' && 'font-semibold',
       )}
     >
       <Flag className="size-3.5 shrink-0" fill="currentColor" strokeWidth={1.75} aria-hidden />
       {PRIORITY_LABEL[priority]}
+      {raisedFrom && (
+        <ArrowUp
+          className="size-3 shrink-0"
+          strokeWidth={2.5}
+          aria-label="raised for the deadline"
+        />
+      )}
     </span>
+  );
+}
+
+/** A request's working priority: the escalated one when the deadline raised it, else its own. */
+export function RequestPriority({
+  request: r,
+}: {
+  request: { priority: Priority; escalatedPriority: Priority | null };
+}) {
+  return (
+    <PriorityBadge
+      priority={r.escalatedPriority ?? r.priority}
+      raisedFrom={r.escalatedPriority ? r.priority : null}
+    />
   );
 }
 
@@ -250,6 +285,8 @@ export function DueBadge({
   if (!dueAt || status === 'RESOLVED') return null;
   const days = daysUntil(dueAt);
   const overdue = new Date(dueAt).getTime() < Date.now();
+  // Amber in the same window the deadline monitor calls "approaching".
+  const soon = new Date(dueAt).getTime() - Date.now() <= DEADLINE_WARNING_HOURS * 3600_000;
   const time = deadlineTime(dueAt);
   const at = time ? `, ${time}` : '';
   const label = overdue
@@ -268,7 +305,7 @@ export function DueBadge({
       title={`Deadline: ${formatDeadline(dueAt)}`}
       className={cx(
         'inline-flex min-w-0 items-center gap-1 text-xs font-medium whitespace-nowrap',
-        overdue ? 'text-urgent' : days <= 2 ? 'text-high' : 'text-ink-2',
+        overdue ? 'text-urgent' : soon ? 'text-high' : 'text-ink-2',
         className,
       )}
     >

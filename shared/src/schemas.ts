@@ -120,11 +120,19 @@ export const listRequestsQuerySchema = z.object({
 export type ListRequestsQuery = Partial<z.output<typeof listRequestsQuerySchema>>;
 
 /** Analytics window: the last 30 or 90 days, or everything. */
-export const ANALYTICS_RANGES = ['30', '90', 'all'] as const;
+export const ANALYTICS_RANGES = ['7', '30', '90', 'all'] as const;
 export const analyticsQuerySchema = z.object({
   range: z.enum(ANALYTICS_RANGES).default('30'),
 });
 export type AnalyticsRange = (typeof ANALYTICS_RANGES)[number];
+
+export const notificationReadSchema = z.object({ read: z.boolean() });
+
+/** Smart assignment suggestions for a request that does not exist yet (the create form). */
+export const recommendationQuerySchema = z.object({
+  category: z.enum(CATEGORIES, { error: 'Choose a category' }),
+  priority: z.enum(PRIORITIES).default('NORMAL'),
+});
 
 export const activityQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),

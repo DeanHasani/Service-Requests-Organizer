@@ -13,13 +13,14 @@ import {
   type ServiceRequest,
 } from '@deskflow/shared';
 import { useCurrentUser } from '../lib/auth';
-import { useAssignees, useRequests, useTriage } from '../lib/queries';
+import { useAssignees, useRecommendationsFor, useRequests, useTriage } from '../lib/queries';
+import { SuggestionHint } from '../components/SmartAssign';
 import { ErrorState } from '../components/errors';
 import { UnassignedSkeleton } from '../components/skeletons';
 import { formatDate, formatDateTime, timeAgo } from '../lib/format';
 import { DeadlineInput, deadlineOf, deadlineToIso } from '../components/DeadlineInput';
 import { Button, EmptyState, PageHeader, Panel, Select } from '../components/ui';
-import { PriorityBadge, RequestRef, SourceLabel } from '../components/request-bits';
+import { RequestPriority, RequestRef, SourceLabel } from '../components/request-bits';
 import { Pagination } from './RequestsPage';
 
 /**
@@ -101,6 +102,8 @@ function ReviewRow({ request: r }: { request: ServiceRequest }) {
   const [category, setCategory] = useState<Category | ''>(r.category ?? '');
   const [due, setDue] = useState(deadlineOf(r.dueAt));
   const [assignee, setAssignee] = useState('');
+  // Suggestions follow the category and priority as set in this row.
+  const suggestions = useRecommendationsFor(category || undefined, priority);
 
   return (
     // Request on top at full width, the review controls in one row underneath.
@@ -108,7 +111,7 @@ function ReviewRow({ request: r }: { request: ServiceRequest }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <RequestRef value={r.referenceNumber} className="text-[11px]" />
-          <PriorityBadge priority={r.priority} />
+          <RequestPriority request={r} />
           <span className="text-xs text-ink-3">
             <SourceLabel source={r.source} />
           </span>
@@ -132,6 +135,11 @@ function ReviewRow({ request: r }: { request: ServiceRequest }) {
         <p className="mt-0.5 line-clamp-1 text-[13px] text-ink-2">
           {r.requesterName}: {r.description}
         </p>
+        <SuggestionHint
+          data={suggestions.data}
+          className="mt-1.5"
+          onPick={(c) => setAssignee(String(c.user.id))}
+        />
       </div>
       <form
         className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center"

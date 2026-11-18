@@ -52,6 +52,32 @@ enum ActionType {
   RESOLVED
   REOPENED
   DEADLINE_CHANGED
+  /// Written by the deadline monitor (no human actor).
+  DEADLINE_APPROACHING
+  DEADLINE_OVERDUE
+  PRIORITY_ESCALATED
+  PRIORITY_RESTORED
+}
+
+/// Where a request stands against its deadline; separate from its lifecycle status.
+enum DeadlineState {
+  ON_TRACK
+  APPROACHING
+  OVERDUE
+  COMPLETED
+}
+
+enum NotificationType {
+  /// A request was assigned to you.
+  ASSIGNED
+  /// Deadline close and nobody owns the request (managers).
+  DEADLINE_UNASSIGNED
+  /// Deadline close, assigned but still Open (assignee and managers).
+  DEADLINE_NOT_STARTED
+  /// Deadline close, in progress (assignee and managers).
+  DEADLINE_IN_PROGRESS
+  /// Deadline passed, not resolved (assignee and managers).
+  DEADLINE_OVERDUE
 }
 
 model User {
@@ -70,56 +96,63 @@ model User {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  assignedRequests Request[]     @relation("Assignee")
-  createdRequests  Request[]     @relation("Creator")
-  resolvedRequests Request[]     @relation("Resolver")
-  escalationRules  Request[]     @relation("Escalation")
+  assignedRequests Request[]      @relation("Assignee")
+  createdRequests  Request[]      @relation("Creator")
+  resolvedRequests Request[]      @relation("Resolver")
+  notifications    Notification[]
   notes            RequestNote[]
   activities       ActivityLog[]
   sessions         Session[]
-  deletedBy        User?         @relation("DeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
-  deletedUsers     User[]        @relation("DeletedBy")
+  deletedBy        User?          @relation("DeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
+  deletedUsers     User[]         @relation("DeletedBy")
 }
 
 model Request {
-  id               Int       @id @default(autoincrement())
-  referenceNumber  String    @unique
+  id                Int            @id @default(autoincrement())
+  referenceNumber   String         @unique
   /// Idempotency key from the client; a retried create returns the existing row.
-  clientRequestId  String    @unique
-  title            String
-  description      String
-  requesterName    String
-  requesterContact String
-  source           Source
+  clientRequestId   String         @unique
+  title             String
+  description       String
+  requesterName     String
+  requesterContact  String
+  source            Source
   /// What kind of issue it is. Null for requests logged before categories existed.
-  category         Category?
-  priority         Priority  @default(NORMAL)
+  category          Category?
+  priority          Priority       @default(NORMAL)
   /// LOW=0 … URGENT=3. Lets the list sort by urgency instead of alphabetically.
-  priorityRank     Int       @default(1)
-  status           Status    @default(OPEN)
+  priorityRank      Int            @default(1)
+  status            Status         @default(OPEN)
   /// Optimistic concurrency token, bumped on every write.
-  version          Int       @default(0)
-  assignedToId     Int?
-  createdById      Int
-  resolvedById     Int?
-  resolvedAt       DateTime?
+  version           Int            @default(0)
+  assignedToId      Int?
+  createdById       Int
+  resolvedById      Int?
+  resolvedAt        DateTime?
   /// Deadline set by a manager.
-  dueAt            DateTime?
-  /// Optional rule set by a manager: once the deadline is under 24 hours away, raise the
-  /// priority to this level (only ever upward). `escalatedAt` records that it has run.
-  escalateTo       Priority?
-  escalatedAt      DateTime?
-  /// The manager who set the rule; the automatic change is recorded in their name.
-  escalationById   Int?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  dueAt             DateTime?
+  /// Optional minimum set by a manager: when the deadline gets close, the operational
+  /// priority rises to at least this level.
+  escalateTo        Priority?
+  /// Operational priority raised by the deadline monitor; null when not escalated. `priority`
+  /// always keeps the priority people chose. Effective priority = escalatedPriority ?? priority.
+  escalatedPriority Priority?
+  /// When the current escalation happened.
+  escalatedAt       DateTime?
+  /// Deadline status kept by the monitor; null when there is no deadline.
+  deadlineState     DeadlineState?
+  /// Bumped when the deadline changes or the request is reopened, so reminders can be sent
+  /// again for the new situation. Part of the notification de-duplication key.
+  deadlineCycle     Int            @default(0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
-  assignedTo   User?         @relation("Assignee", fields: [assignedToId], references: [id], onDelete: Restrict)
-  createdBy    User          @relation("Creator", fields: [createdById], references: [id], onDelete: Restrict)
-  resolvedBy   User?         @relation("Resolver", fields: [resolvedById], references: [id], onDelete: Restrict)
-  escalationBy User?         @relation("Escalation", fields: [escalationById], references: [id], onDelete: Restrict)
-  notes        RequestNote[]
-  activities   ActivityLog[]
+  assignedTo    User?          @relation("Assignee", fields: [assignedToId], references: [id], onDelete: Restrict)
+  createdBy     User           @relation("Creator", fields: [createdById], references: [id], onDelete: Restrict)
+  resolvedBy    User?          @relation("Resolver", fields: [resolvedById], references: [id], onDelete: Restrict)
+  notes         RequestNote[]
+  activities    ActivityLog[]
+  notifications Notification[]
 
   @@index([status])
   @@index([assignedToId, status])
@@ -128,6 +161,7 @@ model Request {
   @@index([updatedAt])
   @@index([dueAt])
   @@index([category])
+  @@index([deadlineState])
 }
 
 model RequestNote {
@@ -147,7 +181,8 @@ model RequestNote {
 model ActivityLog {
   id          Int        @id @default(autoincrement())
   requestId   Int
-  actorId     Int
+  /// Null for automatic events (the deadline monitor).
+  actorId     Int?
   actionType  ActionType
   fieldName   String?
   oldValue    String?
@@ -156,10 +191,31 @@ model ActivityLog {
   createdAt   DateTime   @default(now())
 
   request Request @relation(fields: [requestId], references: [id], onDelete: Restrict)
-  actor   User    @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: Restrict)
 
   @@index([requestId, createdAt])
   @@index([createdAt])
+}
+
+/// In-app notification for one person. `dedupeKey` is unique, so the same reminder for the same
+/// request, person, stage and deadline cycle can never be created twice, even across restarts.
+model Notification {
+  id          Int              @id @default(autoincrement())
+  recipientId Int
+  requestId   Int?
+  type        NotificationType
+  /// Deadline stage it belongs to (approaching_unassigned, overdue, ...), when it is a reminder.
+  stage       String?
+  title       String
+  message     String
+  dedupeKey   String           @unique
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  recipient User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  request   Request? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, readAt, createdAt])
 }
 
 /// Server-side session. `id` is the SHA-256 of the cookie token, never the token itself.

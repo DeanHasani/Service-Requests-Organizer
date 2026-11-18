@@ -30,21 +30,29 @@ npm run lint             # ESLint
 
 ## Results
 
-Last full run: 16 November 2026, Windows 11, Node 25.8.2, Chromium (Playwright 1.65).
+Last full run: 18 November 2026, Windows 11, Node 25.8.2, Chromium (Playwright 1.65).
 
-| Suite     | File                                         | Tests   | Result                   |
-| --------- | -------------------------------------------- | ------- | ------------------------ |
-| API       | `server/tests/auth.test.ts`                  | 17      | passed                   |
-| API       | `server/tests/requests.test.ts`              | 46      | passed                   |
-| API       | `server/tests/status.test.ts`                | 16      | passed                   |
-| API       | `server/tests/notes-and-permissions.test.ts` | 18      | passed                   |
-| Frontend  | `client/src/test/app.test.tsx`               | 23      | passed                   |
-| Frontend  | `client/src/test/safe-next.test.ts`          | 6       | passed                   |
-| Frontend  | `client/src/test/errors.test.tsx`            | 11      | passed                   |
-| Frontend  | `client/src/test/forms.test.tsx`             | 8       | passed                   |
-| E2E       | `tests/e2e/journey.spec.ts`                  | 4       | passed                   |
-| E2E       | `tests/e2e/responsive.spec.ts`               | 6       | passed                   |
-| **Total** |                                              | **155** | **155 passed, 0 failed** |
+| Suite     | File                                           | Tests   | Result                   |
+| --------- | ---------------------------------------------- | ------- | ------------------------ |
+| API       | `server/tests/auth.test.ts`                    | 17      | passed                   |
+| API       | `server/tests/requests.test.ts`                | 47      | passed                   |
+| API       | `server/tests/status.test.ts`                  | 16      | passed                   |
+| API       | `server/tests/notes-and-permissions.test.ts`   | 18      | passed                   |
+| API       | `server/tests/accounts-and-visibility.test.ts` | 21      | passed                   |
+| API       | `server/tests/analytics.test.ts`               | 9       | passed                   |
+| API       | `server/tests/recommendations.test.ts`         | 16      | passed                   |
+| API       | `server/tests/deadlines.test.ts`               | 17      | passed                   |
+| Frontend  | `client/src/test/app.test.tsx`                 | 23      | passed                   |
+| Frontend  | `client/src/test/accounts.test.tsx`            | 9       | passed                   |
+| Frontend  | `client/src/test/analytics.test.tsx`           | 4       | passed                   |
+| Frontend  | `client/src/test/deadlines.test.tsx`           | 3       | passed                   |
+| Frontend  | `client/src/test/errors.test.tsx`              | 11      | passed                   |
+| Frontend  | `client/src/test/forms.test.tsx`               | 8       | passed                   |
+| Frontend  | `client/src/test/deadline.test.ts`             | 5       | passed                   |
+| Frontend  | `client/src/test/safe-next.test.ts`            | 6       | passed                   |
+| E2E       | `tests/e2e/journey.spec.ts`                    | 4       | passed                   |
+| E2E       | `tests/e2e/responsive.spec.ts`                 | 6       | passed                   |
+| **Total** |                                                | **240** | **240 passed, 0 failed** |
 
 `npm run typecheck` and `npm run lint` report no errors. `prettier --check` is clean.
 
@@ -83,6 +91,43 @@ workload counts, no password hashes in responses, unknown user 404, manager crea
 ### Persistence
 
 data written through the API is read back through a fresh database connection (API test), and through a brand-new server process after the journey (E2E).
+
+### Deadlines, escalation and notifications
+
+`deadlines.test.ts` uses simulated times (`runDeadlineMonitor(now)`) rather than waiting.
+
+- **Pure rules:**
+  - no deadline means no state and no escalation
+  - the state boundaries (24 hours, the deadline itself, resolved)
+  - short deadlines are approaching straight away
+  - time-zone boundaries on absolute instants
+  - stage selection, and working priority steps with the Urgent cap and the manager's minimum
+- **Full workflow (the brief's eleven steps):**
+  - an unassigned request due tomorrow reminds the manager, with a Smart Assignment suggestion
+  - assigning it notifies the employee
+  - "not started" reminders reach both the employee and the manager
+  - starting it switches to the in-progress reminder only
+  - overdue notifies both
+  - resolving it marks it completed, restores the working priority and stops all further reminders
+- **Reliability:**
+  - no deadline, no reminders
+  - each reminder is sent once, across repeated, overlapping and post-restart runs
+  - a request resolved before the run is left alone
+  - reopened requests are monitored again with their deadline and history kept
+  - a changed deadline starts over, a far-away one stands down, and a removed one clears
+  - the original priority stays separate and copes with manual changes
+  - only the people involved are notified
+- **APIs:** notifications are recipient-only with read and unread handling, and Needs attention is scoped by role with next steps.
+
+`deadlines.test.tsx` covers the bell (unread count, opening a request, marking it read) and the manager and employee panels.
+
+### Smart assignment
+
+`recommendations.test.ts`: the weights add up to 1; relevant, successful experience beats raw volume elsewhere; one fix is not treated as expertise (no rate or time shown below the minimum sample); reopened fixes count against someone; speed is compared with the team on the same category and priority, not raw hours; heavy and excessive workload are penalised, and a free newcomer can beat an overloaded expert; with no history the fallback is workload then general experience; results are deterministic; the number of candidates is capped. Against the API with real history: the right person is suggested with reasons and sample sizes, deactivated people are never suggested, nothing is assigned by asking, "no history" is stated plainly, reopens lower the held count, the endpoints are manager-only and validate input, and resolved or uncategorised requests are refused with a clear reason.
+
+### Manager insights
+
+`analytics.test.ts`: manager-only with range validation; counts by category, reopens, workload and the trend; key numbers and status and priority mix follow the 7-day and all-time filters (daily buckets for 7 days); inactive requests are listed and a note clears them; success rates appear only with enough resolutions, in name order, without deactivated people; an empty database gives zeros and no made-up rates. `analytics.test.tsx`: the page shows the sections, sample sizes and "not a ranking" note, switches range, and is hidden from employees; the Smart assignment panel explains its suggestion and only assigns after the manager confirms, and is hidden from employees.
 
 ### Frontend
 

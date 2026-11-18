@@ -38,32 +38,38 @@ In development Vite serves the client on `:5173` and proxies `/api` to the API o
 
 ### Endpoints
 
-| Method | Path                               | Who                                               |
-| ------ | ---------------------------------- | ------------------------------------------------- |
-| POST   | `/api/auth/login`                  | anyone (rate limited)                             |
-| POST   | `/api/auth/logout`                 | signed in                                         |
-| POST   | `/api/auth/logout-all`             | signed in (ends every session of the caller)      |
-| POST   | `/api/auth/password`               | signed in (current password required)             |
-| GET    | `/api/auth/me`                     | signed in                                         |
-| GET    | `/api/users`                       | manager: everyone; employee: active, no emails    |
-| GET    | `/api/users/:id`, `/:id/insights`  | manager: anyone; employee: only themselves        |
-| POST   | `/api/users`                       | manager                                           |
-| POST   | `/api/users/:id/reset-password`    | manager (not for themselves)                      |
-| DELETE | `/api/users/:id` (`confirmName`)   | manager; deactivated accounts only, not yourself  |
-| PATCH  | `/api/users/:id` (`isActive`)      | manager                                           |
-| GET    | `/api/requests`                    | signed in (employees: only what they can see)     |
-| GET    | `/api/requests/:id`                | signed in (404 if not visible)                    |
-| POST   | `/api/requests`                    | signed in (employees: no priority/deadline/owner) |
-| PATCH  | `/api/requests/:id`                | manager                                           |
-| PATCH  | `/api/requests/:id/status`         | manager (reopen) or assignee                      |
-| PATCH  | `/api/requests/:id/assignment`     | manager                                           |
-| GET    | `/api/requests/:id/notes`          | signed in (404 if not visible)                    |
-| POST   | `/api/requests/:id/notes`          | manager or assignee                               |
-| GET    | `/api/requests/:id/activity`       | signed in (404 if not visible)                    |
-| GET    | `/api/activity?limit=`             | signed in (visible requests only)                 |
-| GET    | `/api/analytics?range=30\|90\|all` | manager                                           |
-| GET    | `/api/dashboard`                   | signed in (counted over visible requests)         |
-| GET    | `/api/health`                      | anyone                                            |
+| Method | Path                                       | Who                                                                          |
+| ------ | ------------------------------------------ | ---------------------------------------------------------------------------- |
+| POST   | `/api/auth/login`                          | anyone (rate limited)                                                        |
+| POST   | `/api/auth/logout`                         | signed in                                                                    |
+| POST   | `/api/auth/logout-all`                     | signed in (ends every session of the caller)                                 |
+| POST   | `/api/auth/password`                       | signed in (current password required)                                        |
+| GET    | `/api/auth/me`                             | signed in                                                                    |
+| GET    | `/api/users`                               | manager: everyone; employee: active, no emails                               |
+| GET    | `/api/users/:id`, `/:id/insights`          | manager: anyone; employee: only themselves                                   |
+| POST   | `/api/users`                               | manager                                                                      |
+| POST   | `/api/users/:id/reset-password`            | manager (not for themselves)                                                 |
+| DELETE | `/api/users/:id` (`confirmName`)           | manager; deactivated accounts only, not yourself                             |
+| PATCH  | `/api/users/:id` (`isActive`)              | manager                                                                      |
+| GET    | `/api/requests`                            | signed in (employees: only what they can see)                                |
+| GET    | `/api/requests/:id`                        | signed in (404 if not visible)                                               |
+| POST   | `/api/requests`                            | signed in (employees: no priority/deadline/owner)                            |
+| PATCH  | `/api/requests/:id`                        | manager                                                                      |
+| PATCH  | `/api/requests/:id/status`                 | manager (reopen) or assignee                                                 |
+| PATCH  | `/api/requests/:id/assignment`             | manager                                                                      |
+| GET    | `/api/requests/:id/notes`                  | signed in (404 if not visible)                                               |
+| POST   | `/api/requests/:id/notes`                  | manager or assignee                                                          |
+| GET    | `/api/requests/:id/activity`               | signed in (404 if not visible)                                               |
+| GET    | `/api/activity?limit=`                     | signed in (visible requests only)                                            |
+| GET    | `/api/analytics?range=7\|30\|90\|all`      | manager                                                                      |
+| GET    | `/api/notifications`                       | signed in (your own only)                                                    |
+| PATCH  | `/api/notifications/:id` (`read`)          | signed in (your own only)                                                    |
+| POST   | `/api/notifications/read-all`              | signed in                                                                    |
+| GET    | `/api/attention`                           | managers: all requests close to or past their deadline; employees: their own |
+| GET    | `/api/requests/:id/recommendations`        | manager (suggestions only; never assigns)                                    |
+| GET    | `/api/recommendations?category=&priority=` | manager (for the create form)                                                |
+| GET    | `/api/dashboard`                           | signed in (counted over visible requests)                                    |
+| GET    | `/api/health`                              | anyone                                                                       |
 
 `GET /api/requests` accepts `q`, `status`, `priority`, `source`, `assignee` (`me`, `none` or a user id), `due` (`overdue`), `category`, `sort` (`createdAt`, `updatedAt`, `priority`, `referenceNumber`, `title`, `dueAt`; undated requests sort last), `order`, `page` and `pageSize` (max 100).
 
@@ -96,18 +102,31 @@ sequenceDiagram
 
 ## Main modules
 
-| Module                            | Responsibility                                                                             |
-| --------------------------------- | ------------------------------------------------------------------------------------------ |
-| `shared/src/domain.ts`            | Enums, labels, `TRANSITIONS`, `canTransition`, `canWorkOn`, `canAssign`, `formatReference` |
-| `shared/src/schemas.ts`           | Zod schemas for every request body and query, used by both server and forms                |
-| `server/src/auth.ts`              | Session create/verify/end, `requireAuth`, `requireCsrf`, `requireRole`                     |
-| `server/src/routes.ts`            | HTTP layer: parse, authorize, call a service, shape the response                           |
-| `server/src/services/requests.ts` | Lifecycle, assignment, edits, reference numbers, idempotent create, activity logging       |
-| `server/src/services/users.ts`    | Team workload, user creation, deactivation (revoke sessions + release work)                |
-| `server/src/lib/errors.ts`        | `AppError`, Zod-to-400 mapping, central error handler that never leaks internals           |
-| `client/src/lib/*`                | API client, auth context, query hooks, formatting                                          |
-| `client/src/components/*`         | Design-system primitives, status/priority badges, lifecycle rail, activity list, app shell |
-| `client/src/pages/*`              | One file per screen                                                                        |
+| Module                                 | Responsibility                                                                                                                                                                                |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared/src/domain.ts`                 | Enums, labels, `TRANSITIONS`, `canTransition`, `canWorkOn`, `canAssign`, `formatReference`                                                                                                    |
+| `shared/src/schemas.ts`                | Zod schemas for every request body and query, used by both server and forms                                                                                                                   |
+| `server/src/auth.ts`                   | Session create/verify/end, `requireAuth`, `requireCsrf`, `requireRole`                                                                                                                        |
+| `server/src/routes.ts`                 | HTTP layer: parse, authorize, call a service, shape the response                                                                                                                              |
+| `server/src/services/requests.ts`      | Lifecycle, assignment, edits, reference numbers, idempotent create, activity logging                                                                                                          |
+| `server/src/services/users.ts`         | Team workload, user creation, deactivation (revoke sessions + release work), passwords, insights per person                                                                                   |
+| `server/src/services/analytics.ts`     | Manager insights: key metrics, status and priority mix, categories, trend, inactive requests, workload and outcomes per employee, all computed from the database                              |
+| `server/src/deadlines/*`               | Deadline & escalation: thresholds in `config.ts`, pure rules in `engine.ts`, the scheduled monitor, per-request evaluation and Needs attention in `monitor.ts` ([deadlines.md](deadlines.md)) |
+| `server/src/services/notifications.ts` | Persistent in-app notifications with a unique de-duplication key per notification                                                                                                             |
+| `server/src/recommendations/*`         | Smart assignment: weights in `config.ts`, pure scoring in `score.ts`, data gathering in `recommend.ts` ([recommendations.md](recommendations.md))                                             |
+| `server/src/lib/errors.ts`             | `AppError`, Zod-to-400 mapping, central error handler that never leaks internals                                                                                                              |
+| `client/src/lib/*`                     | API client, auth context, query hooks, formatting                                                                                                                                             |
+| `client/src/components/*`              | Design-system primitives, status/priority badges, lifecycle rail, activity list, app shell                                                                                                    |
+| `client/src/pages/*`                   | One file per screen                                                                                                                                                                           |
+
+## Scheduled work
+
+The API process runs two background jobs, both started in `server/src/index.ts`:
+
+- **Session sweep** (hourly): deletes expired sessions.
+- **Deadline monitor** (at startup, then every minute): updates deadline status and working priority, records automatic events in the history, and sends reminders. It keeps no state in memory; everything is in the database, so restarts and repeated runs are safe. It is also run for a single request right after each change to it. Details: [deadlines.md](deadlines.md).
+
+A single API process is assumed. Running several would still not duplicate notifications (the database enforces unique keys), but they would all do the same work.
 
 ## Technical decisions and tradeoffs
 

@@ -3,15 +3,20 @@ import { Link, Navigate } from 'react-router';
 import {
   AlarmClock,
   CheckCircle2,
+  CircleDot,
+  Hourglass,
   Inbox,
-  RotateCcw,
+  RefreshCw,
   Table2,
   Timer,
+  UserRoundX,
   type LucideIcon,
 } from 'lucide-react';
 import {
   ANALYTICS_RANGES,
   CATEGORY_LABEL,
+  PRIORITY_LABEL,
+  STATUS_LABEL,
   UNCATEGORISED,
   type Analytics,
   type AnalyticsRange,
@@ -22,13 +27,14 @@ import { useAnalytics } from '../lib/queries';
 import { cx, formatDuration, formatShortDate } from '../lib/format';
 import { ErrorState } from '../components/errors';
 import { Avatar, EmptyState, PageHeader, Panel, PanelHeader, Skeleton } from '../components/ui';
-import { RequestRef, StatusBadge } from '../components/request-bits';
+import { PriorityBadge, RequestRef, StatusBadge } from '../components/request-bits';
 
 /** Series colours: validated as a pair (CVD and normal vision) against the white panel surface. */
 const CREATED = '#3d63dd';
 const RESOLVED = '#3fa56f';
 
 const RANGE_LABEL: Record<AnalyticsRange, string> = {
+  '7': '7 days',
   '30': '30 days',
   '90': '90 days',
   all: 'All time',
@@ -50,7 +56,7 @@ function AnalyticsView() {
   return (
     <>
       <PageHeader
-        title="Analytics"
+        title="Manager insights"
         subtitle="How the queue is doing: what comes in, what takes longest, what comes back, and who is carrying it."
         actions={<RangePicker value={range} onChange={setRange} />}
       />
@@ -75,10 +81,12 @@ function AnalyticsView() {
             <CategoryPanel data={q.data} />
             <TrendPanel data={q.data} />
           </div>
-          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-            <WorkloadPanel data={q.data} />
-            <ReopenedPanel data={q.data} />
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-2">
+            <StatusPriorityPanel data={q.data} />
+            <AttentionPanel data={q.data} />
           </div>
+          <WorkloadPanel data={q.data} />
+          <ReopenedPanel data={q.data} />
         </div>
       )}
     </>
@@ -119,24 +127,15 @@ function Summary({ data, range }: { data: Analytics; range: AnalyticsRange }) {
   const window = range === 'all' ? 'all time' : `last ${RANGE_LABEL[range]}`;
   const tiles: { label: string; value: string | number; note: string; icon: LucideIcon }[] = [
     { label: 'Logged', value: s.created, note: window, icon: Inbox },
+    { label: 'Open', value: s.openNow, note: 'right now', icon: CircleDot },
+    { label: 'In progress', value: s.inProgressNow, note: 'right now', icon: RefreshCw },
     { label: 'Resolved', value: s.resolved, note: window, icon: CheckCircle2 },
+    { label: 'Unassigned', value: s.unassignedNow, note: 'right now', icon: UserRoundX },
     {
-      label: 'Average time',
+      label: 'Avg. time',
       value: hours(s.avgResolveHours),
       note: 'logged to work',
       icon: Timer,
-    },
-    {
-      label: 'Reopen rate',
-      value: s.reopenRate === null ? '–' : `${Math.round(s.reopenRate * 100)}%`,
-      note: 'of resolved work',
-      icon: RotateCcw,
-    },
-    {
-      label: 'Overdue now',
-      value: s.overdueNow,
-      note: `of ${s.openNow} open`,
-      icon: AlarmClock,
     },
   ];
   return (
@@ -144,17 +143,21 @@ function Summary({ data, range }: { data: Analytics; range: AnalyticsRange }) {
       {tiles.map(({ label, value, note, icon: Icon }) => (
         <div
           key={label}
-          className="ledger-cell flex flex-col gap-3 rounded-panel border border-line bg-surface px-4 py-3.5"
+          className="ledger-cell flex h-[124px] min-w-0 flex-col justify-between gap-3 overflow-hidden rounded-panel border border-line bg-surface px-4 py-4"
         >
           <span className="flex items-start justify-between gap-2">
-            <span className="text-sm font-semibold text-ink">{label}</span>
+            {/* One line only: a squeezed neighbour must never make the row taller. */}
+            <span className="truncate text-sm font-semibold whitespace-nowrap text-ink">
+              {label}
+            </span>
             <Icon className="size-[18px] shrink-0 text-ink" strokeWidth={1.75} aria-hidden />
           </span>
-          <span className="flex items-baseline gap-3">
-            <span className="ledger-num tabular inline-block origin-left text-[28px] leading-none font-semibold tracking-[-0.03em] whitespace-nowrap">
+          {/* The note sits on its own line under the number, so it is never cut off. */}
+          <span className="flex flex-col gap-1.5">
+            <span className="ledger-num tabular inline-block origin-left text-[36px] leading-none font-semibold tracking-[-0.03em] whitespace-nowrap">
               {value}
             </span>
-            <span className="truncate text-xs text-ink-3">{note}</span>
+            <span className="truncate text-xs whitespace-nowrap text-ink-3">{note}</span>
           </span>
         </div>
       ))}
@@ -254,7 +257,14 @@ function useWidth<T extends HTMLElement>() {
   return [ref, width] as const;
 }
 
-const weekLabel = (iso: string) => formatShortDate(iso);
+type Bucket = Analytics['trendBucket'];
+const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric' });
+/** Axis label for a bucket: "Tue 17" for days, "Nov 10" for weeks. */
+const bucketLabel = (iso: string, bucket: Bucket) =>
+  bucket === 'day' ? dayFmt.format(new Date(iso)) : formatShortDate(iso);
+/** Tooltip title: "Tue 17" or "Week of Nov 10". */
+const bucketTitle = (iso: string, bucket: Bucket) =>
+  bucket === 'day' ? bucketLabel(iso, bucket) : `Week of ${formatShortDate(iso)}`;
 
 function TrendPanel({ data }: { data: Analytics }) {
   const [asTable, setAsTable] = useState(false);
@@ -262,7 +272,7 @@ function TrendPanel({ data }: { data: Analytics }) {
   return (
     <Panel className="overflow-hidden">
       <PanelHeader
-        title="Week by week"
+        title={data.trendBucket === 'day' ? 'Day by day' : 'Week by week'}
         action={
           <button
             type="button"
@@ -277,7 +287,7 @@ function TrendPanel({ data }: { data: Analytics }) {
       {weeks.length === 0 ? (
         <EmptyState icon={<Inbox />} title="No requests in this period" compact />
       ) : asTable ? (
-        <TrendTable weeks={weeks} />
+        <TrendTable weeks={weeks} bucket={data.trendBucket} />
       ) : (
         <div className="flex flex-col gap-5 px-4 py-4">
           <ChartBlock
@@ -289,10 +299,10 @@ function TrendPanel({ data }: { data: Analytics }) {
               </>
             }
           >
-            <VolumeChart weeks={weeks} />
+            <VolumeChart weeks={weeks} bucket={data.trendBucket} />
           </ChartBlock>
           <ChartBlock title="Average time to resolve">
-            <SpeedChart weeks={weeks} />
+            <SpeedChart weeks={weeks} bucket={data.trendBucket} />
           </ChartBlock>
         </div>
       )}
@@ -361,7 +371,7 @@ function Tooltip({ x, width, children }: { x: number; width: number; children: R
   );
 }
 
-function VolumeChart({ weeks }: { weeks: Analytics['trend'] }) {
+function VolumeChart({ weeks, bucket }: { weeks: Analytics['trend']; bucket: Bucket }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const yTicks = ticks(Math.max(1, ...weeks.flatMap((w) => [w.created, w.resolved])));
@@ -399,7 +409,7 @@ function VolumeChart({ weeks }: { weeks: Analytics['trend'] }) {
           {weeks.map((w, i) => {
             const cx0 = AXIS_W + slot * i + slot / 2;
             return (
-              <g key={w.weekStart}>
+              <g key={w.start}>
                 {hover === i && (
                   <rect
                     x={cx0 - slot / 2}
@@ -428,7 +438,7 @@ function VolumeChart({ weeks }: { weeks: Analytics['trend'] }) {
                     textAnchor="middle"
                     className="fill-ink-3 text-[10px]"
                   >
-                    {weekLabel(w.weekStart)}
+                    {bucketLabel(w.start, bucket)}
                   </text>
                 )}
                 {/* Hit area wider than the bars */}
@@ -447,7 +457,7 @@ function VolumeChart({ weeks }: { weeks: Analytics['trend'] }) {
       )}
       {hover !== null && weeks[hover] && (
         <Tooltip x={AXIS_W + slot * hover + slot / 2} width={width}>
-          <p className="font-semibold">Week of {weekLabel(weeks[hover]!.weekStart)}</p>
+          <p className="font-semibold">{bucketTitle(weeks[hover]!.start, bucket)}</p>
           <p className="mt-0.5 flex items-center gap-1.5 text-ink-2">
             <span className="size-2 rounded-[2px]" style={{ backgroundColor: CREATED }} />
             Logged{' '}
@@ -464,7 +474,7 @@ function VolumeChart({ weeks }: { weeks: Analytics['trend'] }) {
   );
 }
 
-function SpeedChart({ weeks }: { weeks: Analytics['trend'] }) {
+function SpeedChart({ weeks, bucket }: { weeks: Analytics['trend']; bucket: Bucket }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const H = 110;
@@ -556,7 +566,7 @@ function SpeedChart({ weeks }: { weeks: Analytics['trend'] }) {
           )}
           {weeks.map((w, i) => (
             <rect
-              key={w.weekStart}
+              key={w.start}
               x={px(i) - slot / 2}
               y={0}
               width={slot}
@@ -569,7 +579,7 @@ function SpeedChart({ weeks }: { weeks: Analytics['trend'] }) {
       )}
       {hover !== null && weeks[hover] && (
         <Tooltip x={px(hover)} width={width}>
-          <p className="font-semibold">Week of {weekLabel(weeks[hover]!.weekStart)}</p>
+          <p className="font-semibold">{bucketTitle(weeks[hover]!.start, bucket)}</p>
           <p className="mt-0.5 text-ink-2">
             Average{' '}
             <span className="tabular font-semibold text-ink">
@@ -588,14 +598,14 @@ function SpeedChart({ weeks }: { weeks: Analytics['trend'] }) {
   );
 }
 
-function TrendTable({ weeks }: { weeks: Analytics['trend'] }) {
+function TrendTable({ weeks, bucket }: { weeks: Analytics['trend']; bucket: Bucket }) {
   return (
     <div className="max-h-[360px] overflow-auto">
       <table className="w-full text-left text-[13px]">
         <thead className="sticky top-0 bg-surface">
           <tr className="border-b border-line text-xs text-ink-2">
             <th scope="col" className="py-2.5 pl-4 font-medium">
-              Week of
+              {bucket === 'day' ? 'Day' : 'Week of'}
             </th>
             <th scope="col" className="px-2 py-2.5 text-right font-medium">
               Logged
@@ -610,9 +620,9 @@ function TrendTable({ weeks }: { weeks: Analytics['trend'] }) {
         </thead>
         <tbody className="divide-y divide-line">
           {[...weeks].reverse().map((w) => (
-            <tr key={w.weekStart}>
+            <tr key={w.start}>
               <th scope="row" className="py-2 pl-4 font-medium text-ink">
-                {weekLabel(w.weekStart)}
+                {bucketLabel(w.start, bucket)}
               </th>
               <td className="tabular px-2 py-2 text-right">{w.created}</td>
               <td className="tabular px-2 py-2 text-right">{w.resolved}</td>
@@ -627,83 +637,307 @@ function TrendTable({ weeks }: { weeks: Analytics['trend'] }) {
   );
 }
 
-// ---------- workload ----------
+// ---------- team workload and outcomes ----------
 
 function WorkloadPanel({ data }: { data: Analytics }) {
   const max = Math.max(5, ...data.workload.map((w) => w.active));
   return (
     <Panel className="overflow-hidden">
-      <PanelHeader title="Workload" />
+      <PanelHeader title="Team workload and outcomes" />
       {data.workload.length === 0 ? (
         <EmptyState icon={<Inbox />} title="No active employees" compact />
       ) : (
-        <table className="w-full text-left text-[13px]">
-          <thead>
-            <tr className="border-b border-line bg-canvas/60 text-xs text-ink-2">
-              <th scope="col" className="py-2.5 pr-2 pl-4 font-medium">
-                Employee
-              </th>
-              <th scope="col" className="w-[34%] px-2 py-2.5 font-medium">
-                Active now
-              </th>
-              <th scope="col" className="px-2 py-2.5 text-right font-medium">
-                Overdue
-              </th>
-              <th scope="col" className="px-2 py-2.5 text-right font-medium">
-                Resolved
-              </th>
-              <th
-                scope="col"
-                className="hidden py-2.5 pr-4 pl-2 text-right font-medium sm:table-cell"
-              >
-                Avg time
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {data.workload.map((w) => (
-              <tr key={w.user.id} className="transition-colors hover:bg-canvas">
-                <th scope="row" className="py-2.5 pr-2 pl-4 font-medium">
-                  <Link
-                    to={`/team/${w.user.id}`}
-                    className="flex items-center gap-2 text-ink hover:underline"
-                  >
-                    <Avatar name={w.user.name} size="sm" />
-                    <span className="truncate">{w.user.name}</span>
-                  </Link>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-line bg-canvas/60 text-xs text-ink-2">
+                <th scope="col" className="py-2.5 pr-2 pl-4 font-medium">
+                  Employee
                 </th>
-                <td className="px-2 py-2.5">
-                  <span className="flex items-center gap-2">
-                    <span className="tabular w-5 shrink-0 text-right font-semibold text-ink">
-                      {w.active}
-                    </span>
-                    <span
-                      aria-hidden
-                      className="h-1.5 min-w-8 flex-1 overflow-hidden rounded-full bg-sunken"
+                <th scope="col" className="w-[24%] px-2 py-2.5 font-medium">
+                  Active now
+                </th>
+                <th scope="col" className="px-2 py-2.5 text-right font-medium">
+                  Overdue
+                </th>
+                <th scope="col" className="px-2 py-2.5 text-right font-medium">
+                  Resolutions
+                </th>
+                <th scope="col" className="px-2 py-2.5 font-medium">
+                  Fixes that held
+                </th>
+                <th scope="col" className="px-2 py-2.5 text-right font-medium">
+                  Avg time
+                </th>
+                <th scope="col" className="py-2.5 pr-4 pl-2 font-medium">
+                  Main experience
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {data.workload.map((w) => (
+                <tr key={w.user.id} className="transition-colors hover:bg-canvas">
+                  <th scope="row" className="py-2.5 pr-2 pl-4 font-medium">
+                    <Link
+                      to={`/team/${w.user.id}`}
+                      className="flex items-center gap-2 text-ink hover:underline"
                     >
+                      <Avatar name={w.user.name} size="sm" />
+                      <span className="truncate">{w.user.name}</span>
+                    </Link>
+                  </th>
+                  <td className="px-2 py-2.5">
+                    <span
+                      className="flex items-center gap-2"
+                      title={`${Math.round(w.share * 100)}% of the team's active work`}
+                    >
+                      <span className="tabular w-5 shrink-0 text-right font-semibold text-ink">
+                        {w.active}
+                      </span>
                       <span
-                        className="block h-full rounded-full bg-progress-dot"
-                        style={{ width: `${(w.active / max) * 100}%` }}
+                        aria-hidden
+                        className="h-1.5 min-w-8 flex-1 overflow-hidden rounded-full bg-sunken"
+                      >
+                        <span
+                          className="block h-full rounded-full bg-progress-dot"
+                          style={{ width: `${(w.active / max) * 100}%` }}
+                        />
+                      </span>
+                      <span className="tabular w-9 shrink-0 text-right text-xs text-ink-3">
+                        {Math.round(w.share * 100)}%
+                      </span>
+                    </span>
+                  </td>
+                  <td
+                    className={cx(
+                      'tabular px-2 py-2.5 text-right font-semibold',
+                      w.overdue ? 'text-urgent' : 'text-ink-3',
+                    )}
+                  >
+                    {w.overdue}
+                  </td>
+                  <td className="tabular px-2 py-2.5 text-right text-ink">{w.resolved}</td>
+                  <td className="px-2 py-2.5 whitespace-nowrap">
+                    {w.successRate === null ? (
+                      <span
+                        className="text-ink-3"
+                        title={`Fewer than ${data.minSample} resolutions`}
+                      >
+                        {w.resolved ? `${w.held} of ${w.resolved}, too few` : '–'}
+                      </span>
+                    ) : (
+                      <span className="text-ink">
+                        <span className="tabular font-semibold">
+                          {Math.round(w.successRate * 100)}%
+                        </span>{' '}
+                        <span className="text-xs text-ink-3">
+                          ({w.held} of {w.resolved})
+                        </span>
+                      </span>
+                    )}
+                  </td>
+                  <td className="tabular px-2 py-2.5 text-right whitespace-nowrap text-ink-2">
+                    {hours(w.avgResolveHours)}
+                  </td>
+                  <td className="py-2.5 pr-4 pl-2">
+                    <span className="flex flex-wrap gap-1">
+                      {w.topCategories.length === 0 && <span className="text-ink-3">–</span>}
+                      {w.topCategories.map((c) => (
+                        <span
+                          key={c.category ?? 'none'}
+                          className="rounded-full bg-sunken px-2 py-0.5 text-xs whitespace-nowrap text-ink-2"
+                        >
+                          {categoryName(c.category)} · {c.resolved}
+                        </span>
+                      ))}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="border-t border-line px-4 py-2.5 text-xs text-ink-3">
+        For context, not a ranking: people get different kinds of work. Rates appear once someone
+        has at least {data.minSample} resolutions in the period; resolutions and outcomes follow the
+        selected period, active work is right now.
+      </p>
+    </Panel>
+  );
+}
+
+// ---------- status and priority ----------
+
+const statusBar: Record<string, string> = {
+  OPEN: 'bg-open',
+  IN_PROGRESS: 'bg-progress-dot',
+  RESOLVED: 'bg-resolved-dot',
+};
+
+function StatusPriorityPanel({ data }: { data: Analytics }) {
+  const total = data.byStatus.reduce((n, s) => n + s.count, 0);
+  const maxPriority = Math.max(1, ...data.byPriority.map((p) => p.created));
+  return (
+    <Panel className="overflow-hidden">
+      <PanelHeader title="Status and priority" />
+      <div className="flex flex-col gap-5 p-4">
+        <section aria-label="Requests by status">
+          <p className="mb-2 text-[13px] font-semibold text-ink">
+            Logged in this period, by status now
+          </p>
+          {total === 0 ? (
+            <p className="text-[13px] text-ink-3">Nothing was logged in this period.</p>
+          ) : (
+            <>
+              <span className="flex h-3 overflow-hidden rounded-full bg-sunken" aria-hidden>
+                {data.byStatus.map((s) =>
+                  s.count ? (
+                    <span
+                      key={s.status}
+                      className={cx(
+                        'h-full border-r-2 border-surface last:border-r-0',
+                        statusBar[s.status],
+                      )}
+                      style={{ width: `${(s.count / total) * 100}%` }}
+                    />
+                  ) : null,
+                )}
+              </span>
+              <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-ink-2">
+                {data.byStatus.map((s) => (
+                  <li key={s.status} className="flex items-center gap-1.5">
+                    <span aria-hidden className={cx('size-2 rounded-full', statusBar[s.status])} />
+                    {STATUS_LABEL[s.status]}{' '}
+                    <span className="tabular font-semibold text-ink">{s.count}</span>
+                    <span className="text-ink-3">({Math.round((s.count / total) * 100)}%)</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+        <section aria-label="Requests by priority">
+          <p className="mb-2 text-[13px] font-semibold text-ink">By priority</p>
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="text-left text-xs text-ink-3">
+                <th scope="col" className="pb-1.5 font-medium">
+                  Priority
+                </th>
+                <th scope="col" className="w-[45%] pb-1.5 font-medium">
+                  Logged in period
+                </th>
+                <th scope="col" className="pb-1.5 text-right font-medium">
+                  Open now
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...data.byPriority].reverse().map((p) => (
+                <tr key={p.priority}>
+                  <th scope="row" className="py-1.5 pr-2 text-left font-normal">
+                    <PriorityBadge priority={p.priority} />
+                  </th>
+                  <td className="py-1.5 pr-2">
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-sunken"
+                        aria-hidden
+                      >
+                        <span
+                          className="block h-full rounded-full bg-cobalt"
+                          style={{ width: `${(p.created / maxPriority) * 100}%` }}
+                        />
+                      </span>
+                      <span className="tabular w-7 text-right font-semibold text-ink">
+                        {p.created}
+                      </span>
+                    </span>
+                  </td>
+                  <td className="tabular py-1.5 text-right text-ink">{p.openNow}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <span className="sr-only">
+            {data.byPriority
+              .map((p) => `${PRIORITY_LABEL[p.priority]}: ${p.created} logged`)
+              .join(', ')}
+          </span>
+        </section>
+      </div>
+    </Panel>
+  );
+}
+
+// ---------- needs attention ----------
+
+function AttentionPanel({ data }: { data: Analytics }) {
+  const { stale, summary } = data;
+  return (
+    <Panel className="overflow-hidden">
+      <PanelHeader
+        title="Needs attention"
+        action={
+          <span className="flex items-center gap-3 text-xs text-ink-2">
+            <span className="inline-flex items-center gap-1">
+              <AlarmClock className="size-3.5 text-urgent" aria-hidden />
+              <span className="tabular font-semibold text-ink">{summary.overdueNow}</span> overdue
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Hourglass className="size-3.5 text-high" aria-hidden />
+              <span className="tabular font-semibold text-ink">{stale.count}</span> gone quiet
+            </span>
+          </span>
+        }
+      />
+      {stale.count === 0 ? (
+        <EmptyState
+          icon={<CheckCircle2 />}
+          title="Nothing has gone quiet"
+          body={`Every open request has had activity in the last ${stale.thresholdDays} days.`}
+          compact
+        />
+      ) : (
+        <>
+          <p className="border-b border-line px-4 py-2.5 text-xs text-ink-3">
+            Open requests with no changes or notes for {stale.thresholdDays} days or more, quietest
+            first. Right now, whatever period is selected.
+          </p>
+          <ul className="divide-y divide-line">
+            {stale.items.map((x) => (
+              <li key={x.request.id}>
+                <Link
+                  to={`/requests/${x.request.id}`}
+                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-canvas"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-medium text-ink">
+                      {x.request.title}
+                    </span>
+                    <span className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-ink-3">
+                      <RequestRef
+                        value={x.request.referenceNumber}
+                        className="shrink-0 text-[11px] whitespace-nowrap"
                       />
+                      <span className="truncate">{x.assignee?.name ?? 'Unassigned'}</span>
                     </span>
                   </span>
-                </td>
-                <td
-                  className={cx(
-                    'tabular px-2 py-2.5 text-right font-semibold',
-                    w.overdue ? 'text-urgent' : 'text-ink-3',
-                  )}
-                >
-                  {w.overdue}
-                </td>
-                <td className="tabular px-2 py-2.5 text-right text-ink">{w.resolved}</td>
-                <td className="tabular hidden py-2.5 pr-4 pl-2 text-right whitespace-nowrap text-ink-2 sm:table-cell">
-                  {hours(w.avgResolveHours)}
-                </td>
-              </tr>
+                  <StatusBadge status={x.request.status} />
+                  <span className="tabular w-16 shrink-0 text-right text-[13px] font-semibold text-high">
+                    {x.daysIdle} days
+                  </span>
+                </Link>
+              </li>
             ))}
-          </tbody>
-        </table>
+          </ul>
+          {stale.count > stale.items.length && (
+            <p className="border-t border-line px-4 py-2.5 text-xs text-ink-3">
+              And {stale.count - stale.items.length} more.
+            </p>
+          )}
+        </>
       )}
     </Panel>
   );
@@ -714,7 +948,20 @@ function WorkloadPanel({ data }: { data: Analytics }) {
 function ReopenedPanel({ data }: { data: Analytics }) {
   return (
     <Panel className="overflow-hidden">
-      <PanelHeader title="Most reopened" />
+      <PanelHeader
+        title="Most reopened"
+        action={
+          <span className="text-xs text-ink-2">
+            Reopen rate{' '}
+            <span className="tabular font-semibold text-ink">
+              {data.summary.reopenRate === null
+                ? '–'
+                : `${Math.round(data.summary.reopenRate * 100)}%`}
+            </span>{' '}
+            of resolved work
+          </span>
+        }
+      />
       {data.mostReopened.length === 0 ? (
         <EmptyState
           icon={<CheckCircle2 />}

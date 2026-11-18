@@ -5,6 +5,8 @@ import { rateLimit } from 'express-rate-limit';
 import {
   activityQuerySchema,
   analyticsQuerySchema,
+  recommendationQuerySchema,
+  notificationReadSchema,
   assignmentSchema,
   canWorkOn,
   changePasswordSchema,
@@ -44,6 +46,9 @@ import {
 import * as requests from './services/requests';
 import * as users from './services/users';
 import { getAnalytics } from './services/analytics';
+import { recommend, recommendForRequest } from './recommendations/recommend';
+import { attentionFor } from './deadlines/monitor';
+import * as notifications from './services/notifications';
 
 // Compared against when the email is unknown, so response time does not reveal which emails exist.
 export const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', users.BCRYPT_ROUNDS);
@@ -218,6 +223,32 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
     res.json({ data: rows.map(toActivity) });
   });
 
+  // ---------- notifications (always the caller's own) ----------
+  api.get('/notifications', async (req, res) => {
+    res.json({ data: await notifications.listNotifications(authOf(req).user) });
+  });
+  api.patch('/notifications/:id', async (req, res) => {
+    const { read } = parse(notificationReadSchema, req.body);
+    res.json({ data: await notifications.setRead(authOf(req).user, idOf(req.params), read) });
+  });
+  api.post('/notifications/read-all', async (req, res) => {
+    res.json({ data: await notifications.markAllRead(authOf(req).user) });
+  });
+
+  // ---------- needs attention: deadlines close or past (managers: all; employees: theirs) ----------
+  api.get('/attention', async (req, res) => {
+    res.json({ data: await attentionFor(authOf(req).user) });
+  });
+
+  // ---------- smart assignment (managers): suggestions only, never assigns ----------
+  api.get('/requests/:id/recommendations', requireRole('MANAGER'), async (req, res) => {
+    res.json({ data: await recommendForRequest(idOf(req.params)) });
+  });
+  api.get('/recommendations', requireRole('MANAGER'), async (req, res) => {
+    const { category, priority } = parse(recommendationQuerySchema, req.query);
+    res.json({ data: await recommend(category, priority) });
+  });
+
   // ---------- analytics (managers) ----------
   api.get('/analytics', requireRole('MANAGER'), async (req, res) => {
     const { range } = parse(analyticsQuerySchema, req.query);
@@ -241,8 +272,9 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
       prisma.request.count({
         where: within({ assignedToId: null, status: { not: 'RESOLVED' } }),
       }),
+      // Counted by working priority: raised by the deadline monitor where that applies.
       prisma.request.groupBy({
-        by: ['priority'],
+        by: ['priority', 'escalatedPriority'],
         where: within({ status: { not: 'RESOLVED' } }),
         _count: { _all: true },
       }),
@@ -267,7 +299,8 @@ export function apiRouter({ loginLimit }: { loginLimit: number }) {
       },
       byPriority: { LOW: 0, NORMAL: 0, HIGH: 0, URGENT: 0 },
     };
-    for (const g of byPriority) summary.byPriority[g.priority as Priority] = g._count._all;
+    for (const g of byPriority)
+      summary.byPriority[(g.escalatedPriority ?? g.priority) as Priority] += g._count._all;
     res.json({ data: summary });
   });
 

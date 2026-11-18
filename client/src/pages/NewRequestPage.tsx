@@ -15,7 +15,8 @@ import {
 } from '@deskflow/shared';
 import type { z } from 'zod';
 import { useCurrentUser } from '../lib/auth';
-import { useAssignees, useCreateRequest } from '../lib/queries';
+import { useAssignees, useCreateRequest, useRecommendationsFor } from '../lib/queries';
+import { SuggestionHint } from '../components/SmartAssign';
 import { ApiError } from '../lib/api';
 import { DeadlineInput, deadlineToIso, type Deadline } from '../components/DeadlineInput';
 import { Button, Field, Input, PageHeader, Panel, Select, Textarea } from '../components/ui';
@@ -57,6 +58,8 @@ export function NewRequestPage() {
     handleSubmit,
     setError,
     setFocus,
+    setValue,
+    watch,
     control,
     formState: { errors, isSubmitting },
   } = useForm<FormValues, unknown, z.output<typeof createRequestSchema>>({
@@ -95,6 +98,8 @@ export function NewRequestPage() {
     }
   });
 
+  // Smart assignment for the request being written: once a category is chosen (managers only).
+  const suggestions = useRecommendationsFor(watch('category'), watch('priority'), !isEmployee);
   const busy = isSubmitting || create.isPending;
 
   return (
@@ -211,6 +216,16 @@ export function NewRequestPage() {
                       </option>
                     ))}
                   </Select>
+                  <SuggestionHint
+                    data={suggestions.data}
+                    className="mt-1.5"
+                    onPick={(c) =>
+                      setValue('assignedToId', c.user.id, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                  />
                 </Field>
                 <Field
                   id="dueAt"
@@ -225,9 +240,9 @@ export function NewRequestPage() {
               {deadline.date && (
                 <Field
                   id="escalateTo"
-                  label={`In the last ${ESCALATION_HOURS} hours, raise priority to`}
+                  label="When the deadline is close, raise the working priority to"
                   optional
-                  hint="Start it low and let it rise on its own as the deadline gets close."
+                  hint={`Within ${ESCALATION_HOURS} hours of the deadline, or once it passes. The priority you set is kept.`}
                 >
                   <Select
                     id="escalateTo"
@@ -235,7 +250,7 @@ export function NewRequestPage() {
                     onChange={(e) => setEscalate(e.target.value as Priority | '')}
                     className="sm:max-w-xs"
                   >
-                    <option value="">Keep as it is</option>
+                    <option value="">One level up (default)</option>
                     {PRIORITIES.filter((p) => p !== 'LOW').map((p) => (
                       <option key={p} value={p}>
                         {PRIORITY_LABEL[p]}

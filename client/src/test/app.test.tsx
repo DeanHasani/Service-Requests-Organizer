@@ -316,7 +316,9 @@ describe('request details', () => {
     });
     renderApp('/requests/7');
     expect(
-      await screen.findByText('Nobody owns this yet. Choose an assignee in Details.'),
+      await screen.findByText(
+        'Nobody owns this yet. Pick someone from the suggestions below, or in Details.',
+      ),
     ).toBeInTheDocument();
   });
 

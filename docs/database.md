@@ -12,6 +12,8 @@ erDiagram
   User ||--o{ RequestNote : writes
   User ||--o{ ActivityLog : performs
   User ||--o{ Session : has
+  User ||--o{ Notification : receives
+  Request ||--o{ Notification : about
   Request ||--o{ RequestNote : has
   Request ||--o{ ActivityLog : has
 
@@ -22,6 +24,9 @@ erDiagram
     string passwordHash
     enum role "MANAGER | EMPLOYEE"
     boolean isActive
+    boolean mustChangePassword "temporary password set"
+    datetime deletedAt "account closed; name kept on history"
+    int deletedById FK
     datetime createdAt
     datetime updatedAt
   }
@@ -34,7 +39,11 @@ erDiagram
     string requesterName
     string requesterContact
     enum source "PHONE | EMAIL | MESSAGE | OTHER"
-    enum priority "LOW | NORMAL | HIGH | URGENT"
+    enum category "HARDWARE | SOFTWARE | NETWORK | ACCESS | FACILITIES | OTHER (null = uncategorised)"
+    enum priority "LOW | NORMAL | HIGH | URGENT (as chosen; never changed by the monitor)"
+    enum escalatedPriority "working priority raised by the deadline monitor, or null"
+    enum deadlineState "ON_TRACK | APPROACHING | OVERDUE | COMPLETED, or null without a deadline"
+    int deadlineCycle "bumped when the deadline changes or the request is reopened"
     int priorityRank "0..3, for sorting"
     enum status "OPEN | IN_PROGRESS | RESOLVED"
     int version "optimistic concurrency"
@@ -78,6 +87,14 @@ erDiagram
 ```
 
 `ActivityLog.actionType` is one of `CREATED`, `UPDATED`, `PRIORITY_CHANGED`, `ASSIGNED`, `REASSIGNED`, `UNASSIGNED`, `STATUS_CHANGED`, `RESOLVED`, `REOPENED`.
+
+### Deadlines, escalation and notifications
+
+- `Request.dueAt` is stored in UTC. `deadlineState`, `escalatedPriority`, `escalatedAt` and `deadlineCycle` are maintained by the deadline monitor; `priorityRank` follows the working priority (`escalatedPriority ?? priority`) so lists sort by it. `escalateTo` is an optional minimum a manager sets.
+- `ActivityLog.actorId` is null for automatic events written by the monitor (`DEADLINE_APPROACHING`, `DEADLINE_OVERDUE`, `PRIORITY_ESCALATED`, `PRIORITY_RESTORED`).
+- `Notification(id, recipientId, requestId?, type, stage?, title, message, dedupeKey UNIQUE, readAt?, createdAt)` with an index on `(recipientId, readAt, createdAt)`. The unique `dedupeKey` is what prevents duplicate reminders. Notifications are deleted with their recipient or request (cascade).
+
+See [deadlines.md](deadlines.md) for the rules.
 
 ## Foreign keys
 
@@ -133,3 +150,7 @@ The version check is an `updateMany ... where { id, version }`. If it matches ze
 ## Seed
 
 `npm run db:seed` upserts four users by email and inserts 18 requests keyed by fixed `clientRequestId`s, each with backdated activity and notes. Running it again skips everything that exists.
+
+It also adds 90 resolved requests spread over four months so analytics and smart assignment have real history to work from. Who handled each one, how fast and whether it was reopened follow a fixed per-person profile (Dean is strongest on Network, Roman on Hardware and Facilities, Roxanne on Account access and Software, each with a weak spot), generated deterministically so every run produces the same data. It is demo data, clearly keyed (`…-9100-…`), and replaces an earlier, evenly spread version (`…-9000-…`) if a database still has it.
+
+Fields added since the first release, each with its own migration: `User.mustChangePassword`, `User.deletedAt` and `deletedById`, `Request.dueAt`, `Request.category`, and the automatic priority rule (`escalateTo`, `escalatedAt`, `escalationById`).

@@ -1,4 +1,11 @@
-import { CATEGORIES, type Analytics, type AnalyticsRange, type Category } from '@deskflow/shared';
+import {
+  CATEGORIES,
+  PRIORITIES,
+  STATUSES,
+  type Analytics,
+  type AnalyticsRange,
+  type Category,
+} from '@deskflow/shared';
 import { prisma } from '../db';
 
 const HOUR = 3600_000;
@@ -16,6 +23,16 @@ const median = (xs: number[]) => {
   const mid = Math.floor(s.length / 2);
   return round1(s.length % 2 ? s[mid]! : (s[mid - 1]! + s[mid]!) / 2);
 };
+
+/** Unresolved requests with no activity for this many days count as inactive. */
+export const STALE_DAYS = 5;
+/** Below this many resolutions, success rates are not shown as facts. */
+const MIN_SAMPLE = 3;
+
+/** Midnight (server local time) of the day `d` falls in. */
+function dayStart(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
 
 /** Monday 00:00 (server local time) of the week `d` falls in. */
 function weekStart(d: Date) {
@@ -41,7 +58,9 @@ export async function getAnalytics(range: AnalyticsRange, now = new Date()): Pro
         title: true,
         status: true,
         category: true,
+        priority: true,
         createdAt: true,
+        updatedAt: true,
         resolvedAt: true,
         dueAt: true,
         assignedToId: true,
@@ -51,6 +70,7 @@ export async function getAnalytics(range: AnalyticsRange, now = new Date()): Pro
     prisma.activityLog.findMany({
       where: { actionType: { in: ['RESOLVED', 'REOPENED'] } },
       select: { requestId: true, actorId: true, actionType: true, createdAt: true },
+      orderBy: [{ requestId: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
     }),
     prisma.user.findMany({
       where: { role: 'EMPLOYEE', isActive: true, deletedAt: null },
@@ -58,6 +78,22 @@ export async function getAnalytics(range: AnalyticsRange, now = new Date()): Pro
       orderBy: { name: 'asc' },
     }),
   ]);
+  const [lastLog, lastNote, names] = await Promise.all([
+    prisma.activityLog.groupBy({ by: ['requestId'], _max: { createdAt: true } }),
+    prisma.requestNote.groupBy({ by: ['requestId'], _max: { createdAt: true } }),
+    prisma.user.findMany({ select: { id: true, name: true } }),
+  ]);
+  const nameOf = new Map(names.map((u) => [u.id, u.name]));
+  // A resolution "held" unless the very next event on that request is a reopen.
+  const heldEvent = new Set<(typeof events)[number]>();
+  events.forEach((e, i) => {
+    const next = events[i + 1];
+    if (
+      e.actionType === 'RESOLVED' &&
+      !(next && next.requestId === e.requestId && next.actionType === 'REOPENED')
+    )
+      heldEvent.add(e);
+  });
   const byId = new Map(requests.map((r) => [r.id, r]));
   const open = (r: (typeof requests)[number]) => r.status !== 'RESOLVED';
   const late = (r: (typeof requests)[number]) => open(r) && !!r.dueAt && r.dueAt < now;
@@ -115,37 +151,88 @@ export async function getAnalytics(range: AnalyticsRange, now = new Date()): Pro
         : [];
     });
 
-  // ---------- workload ----------
-  const workload = employees
-    .map((u) => {
-      const theirs = requests.filter((r) => r.assignedToId === u.id && open(r));
-      const resolvedBy = new Set(
-        resolutions.filter((e) => e.actorId === u.id).map((e) => e.requestId),
-      );
-      return {
-        user: u,
-        active: theirs.length,
-        overdue: theirs.filter(late).length,
-        resolved: resolvedBy.size,
-        avgResolveHours: avg(resolvedInWindow.filter((r) => r.resolvedById === u.id).map(hours)),
-      };
-    })
-    .sort((a, b) => b.active - a.active || b.overdue - a.overdue || b.resolved - a.resolved);
+  // ---------- workload and outcomes, per person (name order: context, not a ranking) ----------
+  const activeTotal = requests.filter((r) => open(r) && r.assignedToId !== null).length;
+  const workload = employees.map((u) => {
+    const theirs = requests.filter((r) => r.assignedToId === u.id && open(r));
+    const mine = resolutions.filter((e) => e.actorId === u.id);
+    const held = mine.filter((e) => heldEvent.has(e)).length;
+    const perCategory = new Map<Category | null, number>();
+    for (const e of mine) {
+      const c = byId.get(e.requestId)?.category ?? null;
+      perCategory.set(c, (perCategory.get(c) ?? 0) + 1);
+    }
+    return {
+      user: u,
+      active: theirs.length,
+      overdue: theirs.filter(late).length,
+      share: activeTotal ? Math.round((theirs.length / activeTotal) * 1000) / 1000 : 0,
+      resolved: mine.length,
+      held,
+      successRate:
+        mine.length >= MIN_SAMPLE ? Math.round((held / mine.length) * 1000) / 1000 : null,
+      avgResolveHours: avg(resolvedInWindow.filter((r) => r.resolvedById === u.id).map(hours)),
+      topCategories: [...perCategory.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([category, n]) => ({ category, resolved: n })),
+    };
+  });
 
-  // ---------- weekly trend ----------
+  // ---------- status and priority mix ----------
+  const createdInWindow = requests.filter((r) => inWindow(r.createdAt));
+  const byStatus = STATUSES.map((status) => ({
+    status,
+    count: createdInWindow.filter((r) => r.status === status).length,
+  }));
+  const byPriority = PRIORITIES.map((priority) => ({
+    priority,
+    created: createdInWindow.filter((r) => r.priority === priority).length,
+    openNow: requests.filter((r) => open(r) && r.priority === priority).length,
+  }));
+
+  // ---------- inactive for too long ----------
+  const lastSeen = new Map<number, number>();
+  for (const g of [...lastLog, ...lastNote]) {
+    const t = g._max.createdAt?.getTime() ?? 0;
+    lastSeen.set(g.requestId, Math.max(lastSeen.get(g.requestId) ?? 0, t));
+  }
+  // Only things people did count as activity (history entries and notes), not background
+  // updates to the row, so system maintenance never hides a request that has gone quiet.
+  const idleDays = (r: (typeof requests)[number]) =>
+    Math.floor((now.getTime() - (lastSeen.get(r.id) ?? r.createdAt.getTime())) / DAY);
+  const staleAll = requests
+    .filter((r) => open(r) && idleDays(r) >= STALE_DAYS)
+    .sort((a, b) => idleDays(b) - idleDays(a) || a.id - b.id);
+  const stale = {
+    thresholdDays: STALE_DAYS,
+    count: staleAll.length,
+    items: staleAll.slice(0, 8).map((r) => ({
+      request: { id: r.id, referenceNumber: r.referenceNumber, title: r.title, status: r.status },
+      assignee: r.assignedToId
+        ? { id: r.assignedToId, name: nameOf.get(r.assignedToId) ?? 'Unknown' }
+        : null,
+      daysIdle: idleDays(r),
+    })),
+  };
+
+  // ---------- trend: daily for 7 days, weekly otherwise ----------
+  const daily = range === '7';
+  const step = daily ? DAY : WEEK;
+  const startOf = daily ? dayStart : weekStart;
   const earliest = requests.reduce<Date | null>(
     (min, r) => (!min || r.createdAt < min ? r.createdAt : min),
     null,
   );
-  let first = weekStart(since ?? earliest ?? now);
+  let first = startOf(since ?? earliest ?? now);
   const capped = new Date(weekStart(now).getTime() - (MAX_WEEKS - 1) * WEEK);
-  if (first < capped) first = capped;
+  if (!daily && first < capped) first = capped;
   const trend: Analytics['trend'] = [];
-  for (let w = first; w <= now; w = new Date(w.getTime() + WEEK)) {
-    const end = new Date(w.getTime() + WEEK);
+  for (let w = first; w <= now; w = new Date(w.getTime() + step)) {
+    const end = new Date(w.getTime() + step);
     const within = (d: Date) => d >= w && d < end;
     trend.push({
-      weekStart: w.toISOString(),
+      start: w.toISOString(),
       created: requests.filter((r) => within(r.createdAt)).length,
       resolved: events.filter((e) => e.actionType === 'RESOLVED' && within(e.createdAt)).length,
       avgResolveHours: avg(
@@ -166,12 +253,19 @@ export async function getAnalytics(range: AnalyticsRange, now = new Date()): Pro
       reopenRate: resolvedIds.size
         ? Math.min(1, Math.round((reopenedResolved / resolvedIds.size) * 1000) / 1000)
         : null,
-      openNow: requests.filter(open).length,
+      openNow: requests.filter((r) => r.status === 'OPEN').length,
+      inProgressNow: requests.filter((r) => r.status === 'IN_PROGRESS').length,
+      unassignedNow: requests.filter((r) => open(r) && r.assignedToId === null).length,
       overdueNow: requests.filter(late).length,
     },
+    byStatus,
+    byPriority,
+    stale,
     byCategory,
     mostReopened,
     workload,
+    minSample: MIN_SAMPLE,
+    trendBucket: daily ? 'day' : 'week',
     trend,
   };
 }

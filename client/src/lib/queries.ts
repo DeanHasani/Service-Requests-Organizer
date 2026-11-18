@@ -7,12 +7,15 @@ import type {
   CreateUserInput,
   Analytics,
   AnalyticsRange,
+  AttentionItem,
+  NotificationList,
   DashboardSummary,
   Insights,
   ListRequestsQuery,
   Note,
   Page,
   PasswordReset,
+  Recommendations,
   ServiceRequest,
   StatusChangeInput,
   TeamMember,
@@ -68,6 +71,67 @@ export const useDashboard = () =>
 export const useTeam = () =>
   useQuery({ queryKey: keys.team, queryFn: () => api.get<TeamMember[]>('/users') });
 
+// ---------- deadlines and notifications ----------
+
+/** Your notifications; checked every 30 seconds while the app is open. */
+export const useNotifications = () =>
+  useQuery({
+    queryKey: ['notifications'] as const,
+    queryFn: () => api.get<NotificationList>('/notifications'),
+    refetchInterval: 30_000,
+  });
+
+export function useMarkNotification() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, read }: { id: number; read: boolean }) =>
+      api.patch<NotificationList>(`/notifications/${id}`, { read }),
+    onSuccess: (data) => qc.setQueryData(['notifications'], data),
+  });
+}
+
+export function useMarkAllNotifications() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<NotificationList>('/notifications/read-all'),
+    onSuccess: (data) => qc.setQueryData(['notifications'], data),
+  });
+}
+
+/** Requests whose deadline is close or past: all for managers, your own for employees. */
+export const useAttention = () =>
+  useQuery({
+    queryKey: ['attention'] as const,
+    queryFn: () => api.get<AttentionItem[]>('/attention'),
+    refetchInterval: 60_000,
+  });
+
+/** Smart assignment suggestions for an existing, unassigned request (managers). */
+export const useRecommendations = (requestId: number, enabled = true) =>
+  useQuery({
+    queryKey: ['recommendations', 'request', requestId] as const,
+    queryFn: () => api.get<Recommendations>(`/requests/${requestId}/recommendations`),
+    enabled,
+    staleTime: 30_000,
+  });
+
+/** Suggestions for a request still being written (the create form). */
+export const useRecommendationsFor = (
+  category: string | undefined,
+  priority: string | undefined,
+  enabled = true,
+) =>
+  useQuery({
+    queryKey: ['recommendations', 'draft', category, priority] as const,
+    queryFn: () =>
+      api.get<Recommendations>(
+        `/recommendations${toQueryString({ category, priority: priority ?? 'NORMAL' })}`,
+      ),
+    enabled: enabled && !!category,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
+
 /** Team-wide numbers for the manager's analytics page. */
 export const useAnalytics = (range: AnalyticsRange) =>
   useQuery({
@@ -109,6 +173,9 @@ function useRequestWrite<TInput>(
       void qc.invalidateQueries({ queryKey: keys.feed });
       void qc.invalidateQueries({ queryKey: keys.dashboard });
       void qc.invalidateQueries({ queryKey: keys.team });
+      void qc.invalidateQueries({ queryKey: ['recommendations'] });
+      void qc.invalidateQueries({ queryKey: ['attention'] });
+      void qc.invalidateQueries({ queryKey: ['notifications'] });
       if (success) toast.success(typeof success === 'function' ? success(r) : success);
     },
     onError: (err, _input) => {

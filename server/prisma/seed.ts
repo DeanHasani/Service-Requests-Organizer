@@ -516,7 +516,7 @@ const TYPICAL_HOURS: Record<Category, number> = {
   FACILITIES: 72,
   OTHER: 12,
 };
-const HISTORY_COUNT = 64;
+const HISTORY_COUNT = 90;
 const HISTORY_CATEGORIES: Category[] = [
   'SOFTWARE',
   'HARDWARE',
@@ -537,33 +537,94 @@ const PEOPLE: [string, string][] = [
   ['Grace Kim', 'ext. 118'],
 ];
 
+type Worker = 'dean' | 'roman' | 'roxanne';
+/**
+ * How each demo employee does in each category: how often they get that kind of work (weight),
+ * how long they take against the typical time (speed, lower is faster), and how often a fix of
+ * theirs gets reopened. Dean is strongest on Network, Roman on Hardware and Facilities, Roxanne
+ * on Account access and Software, and each has a weak spot, so smart assignment has something
+ * real to tell apart.
+ */
+const SKILL: Record<Worker, Record<Category, [weight: number, speed: number, reopen: number]>> = {
+  dean: {
+    NETWORK: [6, 0.6, 0.03],
+    SOFTWARE: [3, 0.85, 0.08],
+    HARDWARE: [1.5, 1, 0.1],
+    ACCESS: [1, 1.3, 0.2],
+    FACILITIES: [1, 1.4, 0.25],
+    OTHER: [2, 1, 0.08],
+  },
+  roman: {
+    HARDWARE: [6, 0.65, 0.04],
+    FACILITIES: [4, 0.8, 0.08],
+    NETWORK: [1.5, 1.1, 0.12],
+    ACCESS: [1, 1, 0.1],
+    SOFTWARE: [1, 1.5, 0.3],
+    OTHER: [2, 1, 0.1],
+  },
+  roxanne: {
+    ACCESS: [6, 0.5, 0.02],
+    SOFTWARE: [4, 0.75, 0.06],
+    FACILITIES: [1, 1.1, 0.1],
+    HARDWARE: [1, 1.3, 0.2],
+    NETWORK: [1, 1.6, 0.3],
+    OTHER: [2, 0.9, 0.05],
+  },
+};
+const WORKERS: Worker[] = ['dean', 'roman', 'roxanne'];
+/** Repeatable "random" number in [0, 1) for request k, so the seed is the same every time. */
+const noise = (k: number, salt: number) => {
+  const x = Math.sin((k + 1) * 12.9898 + salt * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+const OLD_HISTORY_PREFIX = '00000000-0000-4000-9000-';
+const HISTORY_PREFIX = '00000000-0000-4000-9100-';
+
 /**
  * Resolved requests spread over the last four months, keyed like the main seed so re-running
- * adds nothing twice. Older work took longer, so the trend shows the team getting faster, and
- * about one in nine was reopened once before being resolved again.
+ * adds nothing twice. Who handled each one, how fast, and whether it was reopened follow SKILL;
+ * older work also took longer, so the trend shows the team getting faster. Replaces the first
+ * version of this demo history (which rotated work evenly) if a database still has it.
  */
 async function seedHistory(ids: Record<Key, { id: number; name: string }>) {
-  const workers: Key[] = ['dean', 'roman', 'roxanne'];
+  const old = await prisma.request.findMany({
+    where: { clientRequestId: { startsWith: OLD_HISTORY_PREFIX } },
+    select: { id: true },
+  });
+  if (old.length) {
+    const oldIds = old.map((o) => o.id);
+    await prisma.$transaction([
+      prisma.activityLog.deleteMany({ where: { requestId: { in: oldIds } } }),
+      prisma.requestNote.deleteMany({ where: { requestId: { in: oldIds } } }),
+      prisma.request.deleteMany({ where: { id: { in: oldIds } } }),
+    ]);
+  }
   const priorities: Priority[] = ['NORMAL', 'HIGH', 'LOW', 'NORMAL', 'URGENT', 'NORMAL'];
   const sources: Source[] = ['EMAIL', 'PHONE', 'MESSAGE', 'EMAIL', 'OTHER'];
   let added = 0;
   for (let k = 0; k < HISTORY_COUNT; k++) {
-    const clientRequestId = `00000000-0000-4000-9000-${String(k + 1).padStart(12, '0')}`;
+    const clientRequestId = `${HISTORY_PREFIX}${String(k + 1).padStart(12, '0')}`;
     if (await prisma.request.findUnique({ where: { clientRequestId }, select: { id: true } }))
       continue;
     const category = HISTORY_CATEGORIES[k % HISTORY_CATEGORIES.length]!;
     const titles = HISTORY_TITLES[category];
     const title = titles[Math.floor(k / HISTORY_CATEGORIES.length) % titles.length]!;
     const daysAgo = 4 + ((k * 37) % 116);
-    const worker = ids[workers[k % workers.length]!];
+    // Pick who handled it, weighted by how often each person gets this kind of work.
+    const weights = WORKERS.map((w) => SKILL[w][category][0]);
+    let pick = noise(k, 1) * weights.reduce((a, b) => a + b, 0);
+    const who = WORKERS.find((_, i) => (pick -= weights[i]!) < 0) ?? WORKERS[0]!;
+    const [, speed, reopenChance] = SKILL[who][category];
+    const worker = ids[who];
     const manager = ids.manager;
     const creator = k % 3 === 0 ? worker : manager;
     const priority = priorities[k % priorities.length]!;
     const [requesterName, requesterContact] = PEOPLE[k % PEOPLE.length]!;
     // Older requests were slower: up to about twice the typical time four months ago.
-    const pace = 0.6 + (daysAgo / 120) * 0.9 + ((k * 13) % 7) / 20;
-    const took = Math.max(0.5, TYPICAL_HOURS[category] * pace);
-    const reopened = k % 9 === 4;
+    const pace = 0.6 + (daysAgo / 120) * 0.9 + noise(k, 2) * 0.35;
+    const took = Math.max(0.5, TYPICAL_HOURS[category] * speed * pace);
+    const reopened = noise(k, 3) < reopenChance;
 
     const t0 = new Date(Date.now() - daysAgo * 24 * HOUR - ((k * 5) % 8) * HOUR);
     const at = (h: number) => new Date(t0.getTime() + h * HOUR);

@@ -2,17 +2,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/db';
 import { setActive } from '../src/services/users';
-import { runEscalations } from '../src/services/requests';
-import {
-  app,
-  createRequest,
-  PASSWORD,
-  resetDb,
-  signIn,
-  validRequest,
-  type Client,
-  type Users,
-} from './helpers';
+import { app, createRequest, PASSWORD, resetDb, signIn, type Client, type Users } from './helpers';
 
 let users: Users;
 let mia: Client;
@@ -356,67 +346,5 @@ describe('deleting an account', () => {
     const row = await prisma.user.findUniqueOrThrow({ where: { id: users.bob.id } });
     expect(row.deletedById).toBe(users.manager.id);
     expect(row.deletedAt).not.toBeNull();
-  });
-});
-
-describe('automatic priority before a deadline', () => {
-  const inHours = (h: number) => new Date(Date.now() + h * 3600_000).toISOString();
-
-  it('raises priority once when the deadline is under 24 hours away, logged for the manager', async () => {
-    const r = await createRequest(mia, {
-      priority: 'LOW',
-      dueAt: inHours(30),
-      escalateTo: 'HIGH',
-      assignedToId: users.ann.id,
-    });
-    expect(await runEscalations()).toBe(0);
-    expect((await mia.get(`/api/requests/${r.id}`)).body.data.priority).toBe('LOW');
-
-    // Seven hours later the deadline is 23 hours away.
-    expect(await runEscalations(new Date(Date.now() + 7 * 3600_000))).toBe(1);
-    const after = (await mia.get(`/api/requests/${r.id}`)).body.data;
-    expect(after).toMatchObject({ priority: 'HIGH', escalateTo: 'HIGH' });
-    expect(after.escalatedAt).not.toBeNull();
-    const log = (await mia.get(`/api/requests/${r.id}/activity`)).body.data;
-    expect(log.at(-1)).toMatchObject({
-      actionType: 'PRIORITY_CHANGED',
-      actor: { id: users.manager.id },
-      oldValue: 'Low',
-      newValue: 'High',
-    });
-    // Runs once.
-    expect(await runEscalations(new Date(Date.now() + 8 * 3600_000))).toBe(0);
-  });
-
-  it('never lowers priority and skips resolved work', async () => {
-    const urgent = await createRequest(mia, {
-      priority: 'URGENT',
-      dueAt: inHours(2),
-      escalateTo: 'NORMAL',
-    });
-    const done = await createRequest(mia, {
-      priority: 'LOW',
-      dueAt: inHours(2),
-      escalateTo: 'HIGH',
-      assignedToId: users.ann.id,
-    });
-    await ann.patch(`/api/requests/${done.id}/status`, { status: 'RESOLVED', version: 0 });
-    expect(await runEscalations()).toBe(0);
-    expect((await mia.get(`/api/requests/${urgent.id}`)).body.data.priority).toBe('URGENT');
-    expect((await mia.get(`/api/requests/${done.id}`)).body.data.priority).toBe('LOW');
-  });
-
-  it('is set and turned off by managers only, and a new deadline re-arms it', async () => {
-    const r = await createRequest(mia, { priority: 'LOW', dueAt: inHours(48) });
-    const on = await mia.patch(`/api/requests/${r.id}`, { escalateTo: 'URGENT', version: 0 });
-    expect(on.body.data.escalateTo).toBe('URGENT');
-    expect(
-      (await ann.post('/api/requests', validRequest({ priority: undefined, escalateTo: 'HIGH' })))
-        .status,
-    ).toBe(403);
-    const off = await mia.patch(`/api/requests/${r.id}`, { escalateTo: null, version: 1 });
-    expect(off.body.data.escalateTo).toBeNull();
-    const log = (await mia.get(`/api/requests/${r.id}/activity`)).body.data;
-    expect(log.at(-1).description).toBe('turned off the automatic priority change');
   });
 });
