@@ -1160,6 +1160,25 @@ function ProgressCard({
     (g) =>
       `0 40px 90px -30px rgb(0 0 0 / 0.6), 0 0 ${48 * g}px ${8 * g}px rgb(63 165 111 / ${0.4 * g})`,
   );
+  // Green backlight: when Done completes, a soft glow blooms out around the border (strongest
+  // underneath), then settles low and stays until the loop fades out.
+  const backlight = useMotionValue(0);
+  const backlit = useRef(false);
+  useMotionValueEvent(t, 'change', (v) => {
+    if (v >= 0.999 && !backlit.current) {
+      backlit.current = true;
+      void animate(backlight, reduce ? 0.7 : [0, 1, 0.7], {
+        duration: reduce ? 0 : 1.6,
+        times: [0, 0.35, 1],
+        ease: EASE.out,
+      });
+    } else if (v < 0.95 && backlit.current) {
+      backlit.current = false;
+      void animate(backlight, 0, { duration: reduce ? 0 : 0.6, ease: EASE.in });
+    }
+  });
+  const backlightOpacity = useTransform(() => backlight.get() * fade.get());
+  const backlightScale = useTransform(backlight, [0, 1], [0.97, 1.01]);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -1192,6 +1211,16 @@ function ProgressCard({
       style={{ ...GLASS_TOKENS, x: shake, boxShadow: shadow }}
       className="relative flex flex-col justify-between rounded-[28px] bg-[#0f1b2d]/35 px-7 pt-7 pb-8 text-ink backdrop-blur-xl sm:p-8 lg:min-h-[540px]"
     >
+      <motion.span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-[28px]"
+        style={{
+          opacity: backlightOpacity,
+          scale: backlightScale,
+          boxShadow:
+            '0 0 0 1px rgb(63 165 111 / 0.25), 0 0 26px 2px rgb(63 165 111 / 0.32), 0 22px 70px -6px rgb(63 165 111 / 0.38), 0 0 120px 10px rgb(63 165 111 / 0.12)',
+        }}
+      />
       {halves && (
         <svg
           aria-hidden
