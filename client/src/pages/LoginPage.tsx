@@ -721,14 +721,30 @@ function useArrival(value: MotionValue<number>, threshold: number) {
   const prev = useRef(value.get());
   useMotionValueEvent(value, 'change', (v) => {
     if (!reduce && prev.current < threshold && v >= threshold) {
-      animate(pop, [1, 1.16, 1], { duration: 0.5, times: [0, 0.35, 1], ease: EASE.out });
-      animate(ripple, [1, 1.75], { duration: 0.9, ease: EASE.out });
-      animate(rippleOpacity, [0.55, 0], { duration: 0.9, ease: EASE.out });
+      animate(pop, [1, 1.08, 1], { duration: 0.8, times: [0, 0.4, 1], ease: EASE.out });
+      animate(ripple, [1, 1.6], { duration: 1.3, ease: EASE.out });
+      animate(rippleOpacity, [0.4, 0], { duration: 1.3, ease: EASE.out });
     }
     prev.current = v;
   });
   return { pop, ripple, rippleOpacity };
 }
+
+/**
+ * The stop's own background, filling with its colour from the left as `lit` goes 0 to 1. One
+ * shape, no separate border or fill layer, so there is no seam or dark rim at the edge. The
+ * leading edge is softened by a couple of percent so it glides instead of stepping.
+ */
+function useSweepFill(lit: MotionValue<number>, fade: MotionValue<number>, tone: string) {
+  const colour = useTransform(fade, [0, 1], [EMPTY.fill, tone]);
+  return useTransform(() => {
+    const p = -2 + lit.get() * 104;
+    return `linear-gradient(90deg, ${colour.get()} ${p - 2}%, ${EMPTY.fill} ${p + 2}%)`;
+  });
+}
+
+/** Faint inner edge, so an unlit stop still reads as a circle on the dark page. */
+const STOP_EDGE = 'inset 0 0 0 1px rgb(255 255 255 / 0.07)';
 
 function Logo({ className }: { className?: string }) {
   return (
@@ -766,11 +782,10 @@ function Stop({
   const lit = useSegment(t, at === 0 ? [-1, 0] : at);
   // What shows: lit, dimmed by a restart fade.
   const shown = useTransform(() => lit.get() * fade.get());
-  const ring = useTransform(shown, [0, 1], [EMPTY.ring, tone]);
   const ink = useTransform(shown, [0, 1], ['#5d6c88', '#ffffff']);
   const labelInk = useTransform(shown, [0, 1], [EMPTY.label, '#ffffff']);
-  const glow = useTransform(shown, (v) => `0 0 ${20 * v}px ${-6 * v}px ${tone}`);
-  const sweep = useTransform(lit, (v) => `inset(0 ${(1 - v) * 100}% 0 0 round 999px)`);
+  const glow = useTransform(shown, (v) => `${STOP_EDGE}, 0 0 ${26 * v}px ${-4 * v}px ${tone}`);
+  const fill = useSweepFill(lit, fade, tone);
   // Open is lit from the start, so it arrives when the timeline sets off instead.
   const { pop, ripple, rippleOpacity } = useArrival(at === 0 ? t : lit, at === 0 ? 0.005 : 0.999);
   return (
@@ -790,25 +805,16 @@ function Stop({
         style={{ borderColor: tone, scale: ripple, opacity: rippleOpacity }}
       />
       <motion.span
-        className={cx(
-          'relative grid place-items-center overflow-hidden rounded-full',
-          small ? 'border-2' : 'border-[3px]',
-        )}
+        className="relative grid place-items-center rounded-full"
         style={{
           width: size,
           height: size,
-          backgroundColor: EMPTY.fill,
-          borderColor: ring,
+          background: fill,
           color: ink,
           boxShadow: glow,
           scale: pop,
         }}
       >
-        <motion.span
-          aria-hidden
-          className="absolute inset-0"
-          style={{ backgroundColor: tone, clipPath: sweep, opacity: fade }}
-        />
         <span className="relative grid place-items-center">{children}</span>
       </motion.span>
     </span>
@@ -996,15 +1002,14 @@ function DoneStop({ t, signedIn }: { t: MotionValue<number>; signedIn: boolean }
   const { fade } = useFlow();
   const lit = useSegment(t, SEG.done);
   const shown = useTransform(() => lit.get() * fade.get());
-  // Unlit it looks like the other stops: dark, with a faint ring and tick.
-  const ring = useTransform(shown, [0, 1], [EMPTY.ring, TONE.done]);
+  // Unlit it looks like the other stops: dark, with a faint tick.
   const ghostInk = useTransform(shown, [0, 1], ['#5d6c88', '#ffffff']);
   const labelInk = useTransform(shown, [0, 1], [EMPTY.label, TONE.done]);
   const grow = useTransform(shown, [0, 1], [0.92, 1]);
   const { pop, ripple, rippleOpacity } = useArrival(lit, 0.999);
   const scale = useTransform(() => grow.get() * pop.get());
-  const glow = useTransform(shown, (v) => `0 0 ${18 * v}px ${-6 * v}px ${TONE.done}`);
-  const sweep = useTransform(lit, (v) => `inset(0 ${(1 - v) * 100}% 0 0 round 999px)`);
+  const glow = useTransform(shown, (v) => `${STOP_EDGE}, 0 0 ${26 * v}px ${-4 * v}px ${TONE.done}`);
+  const fill = useSweepFill(lit, fade, TONE.done);
   return (
     <div className="flex flex-col items-center gap-3" aria-live="polite">
       <motion.span className="text-sm font-semibold" style={{ color: labelInk }}>
@@ -1017,21 +1022,9 @@ function DoneStop({ t, signedIn }: { t: MotionValue<number>; signedIn: boolean }
           style={{ borderColor: TONE.done, scale: ripple, opacity: rippleOpacity }}
         />
         <motion.span
-          className="relative grid place-items-center overflow-hidden rounded-full border-[3px]"
-          style={{
-            width: DOT,
-            height: DOT,
-            backgroundColor: EMPTY.fill,
-            borderColor: ring,
-            scale,
-            boxShadow: glow,
-          }}
+          className="relative grid place-items-center rounded-full"
+          style={{ width: DOT, height: DOT, background: fill, scale, boxShadow: glow }}
         >
-          <motion.span
-            aria-hidden
-            className="absolute inset-0"
-            style={{ backgroundColor: TONE.done, clipPath: sweep, opacity: fade }}
-          />
           <DrawnCheck lit={lit} className="relative size-8" placeholder={ghostInk} />
         </motion.span>
       </span>
@@ -1167,18 +1160,17 @@ function ProgressCard({
   useMotionValueEvent(t, 'change', (v) => {
     if (v >= 0.999 && !backlit.current) {
       backlit.current = true;
-      void animate(backlight, reduce ? 0.7 : [0, 1, 0.7], {
-        duration: reduce ? 0 : 1.6,
-        times: [0, 0.35, 1],
-        ease: EASE.out,
+      void animate(backlight, reduce ? 0.75 : [0, 1, 0.75], {
+        duration: reduce ? 0 : 2.6,
+        times: [0, 0.45, 1],
+        ease: [0.33, 0, 0.2, 1],
       });
     } else if (v < 0.95 && backlit.current) {
       backlit.current = false;
-      void animate(backlight, 0, { duration: reduce ? 0 : 0.6, ease: EASE.in });
+      void animate(backlight, 0, { duration: reduce ? 0 : 1, ease: EASE.inOut });
     }
   });
   const backlightOpacity = useTransform(() => backlight.get() * fade.get());
-  const backlightScale = useTransform(backlight, [0, 1], [0.97, 1.01]);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -1216,9 +1208,9 @@ function ProgressCard({
         className="pointer-events-none absolute inset-0 rounded-[28px]"
         style={{
           opacity: backlightOpacity,
-          scale: backlightScale,
+          // Light only: layered, wide and soft, strongest underneath. Nothing moves or scales.
           boxShadow:
-            '0 0 0 1px rgb(63 165 111 / 0.25), 0 0 26px 2px rgb(63 165 111 / 0.32), 0 22px 70px -6px rgb(63 165 111 / 0.38), 0 0 120px 10px rgb(63 165 111 / 0.12)',
+            '0 0 34px 0 rgb(63 165 111 / 0.2), 0 28px 90px -12px rgb(63 165 111 / 0.34), 0 0 160px 18px rgb(63 165 111 / 0.09)',
         }}
       />
       {halves && (
