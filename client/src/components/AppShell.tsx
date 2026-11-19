@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { createContext, use, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -49,13 +49,15 @@ function NavItem({
   count?: number;
   end?: boolean;
 }) {
+  const large = use(LargeNav);
   return (
     <NavLink
       to={to}
       end={end}
       className={({ isActive }) =>
         cx(
-          'relative flex h-9 items-center gap-3 rounded-md px-3 text-[13.5px] font-medium transition-colors duration-150',
+          'relative flex items-center gap-3 rounded-md px-3 font-medium transition-colors duration-150',
+          large ? 'h-11 text-[15.5px]' : 'h-9 text-[13.5px]',
           isActive ? 'text-white' : 'text-navy-ink hover:bg-navy-2 hover:text-white',
         )
       }
@@ -69,10 +71,18 @@ function NavItem({
               transition={{ type: 'spring', duration: 0.35, bounce: 0.15 }}
             />
           )}
-          <Icon className="relative size-[17px] shrink-0 opacity-90" aria-hidden />
+          <Icon
+            className={cx('relative shrink-0 opacity-90', large ? 'size-[19px]' : 'size-[17px]')}
+            aria-hidden
+          />
           <span className="relative flex-1">{label}</span>
           {count !== undefined && count > 0 && (
-            <span className="tabular relative rounded-full bg-white/10 px-1.5 py-px text-[11px] text-navy-ink">
+            <span
+              className={cx(
+                'tabular relative rounded-full bg-white/10 px-1.5 py-px text-navy-ink',
+                large ? 'text-xs' : 'text-[11px]',
+              )}
+            >
               {count}
             </span>
           )}
@@ -82,71 +92,97 @@ function NavItem({
   );
 }
 
-/** `showBell`: the desktop sidebar has the bell; in the phone drawer it lives in the top bar. */
-function SidebarContent({ showBell = false }: { showBell?: boolean }) {
+/** Phone menu: bigger text and taller rows, easier to read and tap. */
+const LargeNav = createContext(false);
+
+/**
+ * Desktop: logo row with the bell, then the menu. `mobile`: the phone menu under the top bar,
+ * which already shows the logo and bell, so it starts with the links, in larger text.
+ */
+function SidebarContent({ mobile = false }: { mobile?: boolean }) {
   const user = useCurrentUser();
   const { logout } = useAuth();
   const { data: summary } = useDashboard();
   const mine = summary ? summary.mine.open + summary.mine.inProgress : undefined;
+  const large = mobile;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex h-16 items-center justify-between gap-2 px-5">
-        <Logo />
-        {showBell && <NotificationBell align="left" />}
-      </div>
-      <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5 px-3 pt-2">
-        <NavItem to="/" end icon={LayoutGrid} label="Dashboard" />
-        <NavItem
-          to="/requests"
-          icon={Inbox}
-          label={user.role === 'MANAGER' ? 'All requests' : 'Requests'}
-        />
-        {user.role === 'EMPLOYEE' && (
-          <NavItem to="/my" icon={ListTodo} label="My requests" count={mine} />
+    <LargeNav value={large}>
+      <div className="flex h-full flex-col">
+        {!mobile && (
+          <div className="flex h-16 items-center justify-between gap-2 px-5">
+            <Logo />
+            <NotificationBell align="left" />
+          </div>
         )}
-        {user.role === 'MANAGER' && (
+        <nav
+          aria-label="Main"
+          className={cx('flex flex-1 flex-col px-3', mobile ? 'gap-1 pt-4' : 'gap-0.5 pt-2')}
+        >
+          <NavItem to="/" end icon={LayoutGrid} label="Dashboard" />
           <NavItem
-            to="/unassigned"
-            icon={ClipboardCheck}
-            label="To review"
-            count={summary?.unassigned}
+            to="/requests"
+            icon={Inbox}
+            label={user.role === 'MANAGER' ? 'All requests' : 'Requests'}
           />
-        )}
-        <NavItem to="/team" icon={Users} label="Team" />
-        {user.role === 'MANAGER' && <NavItem to="/analytics" icon={ChartColumn} label="Insights" />}
-        <NavLink
-          to="/requests/new"
-          className="mt-5 flex h-9 items-center justify-center gap-2 rounded-md border border-white/12 text-[13px] font-medium text-white transition-[background-color,transform] duration-150 hover:bg-navy-2 active:scale-[0.97]"
-        >
-          <Plus className="size-4" aria-hidden /> New request
-        </NavLink>
-      </nav>
-      <div className="flex items-center gap-3 border-t border-white/8 px-4 py-4">
-        <Link
-          to="/profile"
-          title="Your profile"
-          className="-m-1.5 flex min-w-0 flex-1 items-center gap-3 rounded-md p-1.5 transition-colors hover:bg-navy-2"
-        >
-          <Avatar name={user.name} size="md" />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium text-white">{user.name}</span>
-            <span className="block text-xs text-navy-ink-dim">
-              {ROLE_LABEL[user.role]} · Profile
+          {user.role === 'EMPLOYEE' && (
+            <NavItem to="/my" icon={ListTodo} label="My requests" count={mine} />
+          )}
+          {user.role === 'MANAGER' && (
+            <NavItem
+              to="/unassigned"
+              icon={ClipboardCheck}
+              label="To review"
+              count={summary?.unassigned}
+            />
+          )}
+          <NavItem to="/team" icon={Users} label="Team" />
+          {user.role === 'MANAGER' && (
+            <NavItem to="/analytics" icon={ChartColumn} label="Insights" />
+          )}
+          <NavLink
+            to="/requests/new"
+            className={cx(
+              'mt-5 flex items-center justify-center gap-2 rounded-md border border-white/12 font-medium text-white transition-[background-color,transform] duration-150 hover:bg-navy-2 active:scale-[0.97]',
+              large ? 'h-11 text-[15px]' : 'h-9 text-[13px]',
+            )}
+          >
+            <Plus className="size-4" aria-hidden /> New request
+          </NavLink>
+        </nav>
+        <div className="flex items-center gap-3 border-t border-white/8 px-4 py-4">
+          <Link
+            to="/profile"
+            title="Your profile"
+            className="-m-1.5 flex min-w-0 flex-1 items-center gap-3 rounded-md p-1.5 transition-colors hover:bg-navy-2"
+          >
+            <Avatar name={user.name} size="md" />
+            <span className="min-w-0 flex-1">
+              <span
+                className={cx(
+                  'block truncate font-medium text-white',
+                  large ? 'text-[15px]' : 'text-[13px]',
+                )}
+              >
+                {user.name}
+              </span>
+              <span className={cx('block text-navy-ink-dim', large ? 'text-[13px]' : 'text-xs')}>
+                {ROLE_LABEL[user.role]} · Profile
+              </span>
             </span>
-          </span>
-        </Link>
-        <button
-          type="button"
-          onClick={() => void logout()}
-          aria-label="Sign out"
-          title="Sign out"
-          className="grid size-8 place-items-center rounded-md text-navy-ink-dim transition-colors hover:bg-navy-2 hover:text-white"
-        >
-          <LogOut className="size-4" aria-hidden />
-        </button>
+          </Link>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            aria-label="Sign out"
+            title="Sign out"
+            className="grid size-8 place-items-center rounded-md text-navy-ink-dim transition-colors hover:bg-navy-2 hover:text-white"
+          >
+            <LogOut className="size-4" aria-hidden />
+          </button>
+        </div>
       </div>
-    </div>
+    </LargeNav>
   );
 }
 
@@ -154,6 +190,12 @@ export function AppShell() {
   const location = useLocation();
   const [drawer, setDrawer] = useState(false);
   useEffect(() => setDrawer(false), [location.pathname]);
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawer(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [drawer]);
 
   return (
     <div className="min-h-dvh lg:bg-navy lg:py-3 lg:pr-3 lg:pl-60">
@@ -165,61 +207,64 @@ export function AppShell() {
       </a>
 
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 bg-navy lg:block">
-        <SidebarContent showBell />
+        <SidebarContent />
       </aside>
 
-      {/* Mobile top bar + drawer */}
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between bg-navy px-4 lg:hidden">
+      {/* Mobile top bar + menu. The bar stays on top and usable while the menu is open. */}
+      <header className="sticky top-0 z-50 flex h-14 items-center justify-between bg-navy px-4 lg:hidden">
         <Logo />
         <span className="flex items-center gap-1">
           <NotificationBell align="right" />
           <button
             type="button"
-            onClick={() => setDrawer(true)}
-            aria-label="Open menu"
+            onClick={() => setDrawer((v) => !v)}
+            aria-label={drawer ? 'Close menu' : 'Open menu'}
             aria-expanded={drawer}
-            // Hidden while the menu is open (it has its own close button); fades back after.
-            className={cx(
-              'grid size-9 place-items-center rounded-md text-white transition-[opacity,transform] duration-200 hover:bg-navy-2',
-              drawer ? 'pointer-events-none scale-90 opacity-0' : 'opacity-100',
-            )}
+            aria-controls="mobile-menu"
+            className="grid size-9 place-items-center rounded-md text-white transition-colors hover:bg-navy-2"
           >
-            <Menu className="size-5" aria-hidden />
+            {/* The three lines turn into an X, and back. */}
+            <AnimatePresence initial={false} mode="popLayout">
+              <motion.span
+                key={drawer ? 'close' : 'open'}
+                className="grid place-items-center"
+                initial={{ opacity: 0, rotate: drawer ? -90 : 90, scale: 0.7 }}
+                animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                exit={{ opacity: 0, rotate: drawer ? 90 : -90, scale: 0.7 }}
+                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {drawer ? (
+                  <X className="size-5" aria-hidden />
+                ) : (
+                  <Menu className="size-5" aria-hidden />
+                )}
+              </motion.span>
+            </AnimatePresence>
           </button>
         </span>
       </header>
       <AnimatePresence>
         {drawer && (
-          <div
-            className="fixed inset-0 z-40 lg:hidden"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu"
-          >
+          // Below the top bar, so the bar (menu button, bell) stays usable; only the page dims.
+          <div id="mobile-menu" className="fixed inset-x-0 top-14 bottom-0 z-40 lg:hidden">
             <motion.div
-              className="absolute inset-0 bg-navy/40"
+              aria-hidden
+              className="absolute inset-0 bg-navy/45 backdrop-blur-[2px]"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.25 }}
               onClick={() => setDrawer(false)}
             />
             <motion.aside
-              className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-navy shadow-pop"
+              aria-label="Menu"
+              className="absolute inset-y-0 left-0 w-72 max-w-[85vw] overflow-y-auto bg-navy shadow-pop"
               initial={{ transform: 'translateX(-100%)' }}
               animate={{ transform: 'translateX(0%)' }}
               exit={{ transform: 'translateX(-100%)' }}
               transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
             >
-              <button
-                type="button"
-                onClick={() => setDrawer(false)}
-                aria-label="Close menu"
-                className="absolute top-4 right-3 grid size-8 place-items-center rounded-md text-navy-ink hover:bg-navy-2"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
-              <SidebarContent />
+              <SidebarContent mobile />
             </motion.aside>
           </div>
         )}

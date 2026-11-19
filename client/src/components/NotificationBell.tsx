@@ -83,8 +83,12 @@ export function NotificationBell({
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             className={cx(
-              'absolute top-full z-50 mt-2 w-[min(380px,calc(100vw-24px))] overflow-hidden rounded-panel border border-line bg-surface text-ink shadow-pop',
-              align === 'left' ? 'left-0 origin-top-left' : 'right-0 origin-top-right',
+              'z-50 overflow-hidden rounded-panel border border-line bg-surface text-ink shadow-pop',
+              // Sidebar: hangs from the bell. Phone top bar: spans the screen with a 12px margin,
+              // so it never runs off either edge.
+              align === 'left'
+                ? 'absolute top-full left-0 mt-2 w-[380px] origin-top-left'
+                : 'fixed inset-x-3 top-[60px] origin-top-right',
             )}
           >
             <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
